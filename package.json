@@ -1,0 +1,24 @@
+{
+  "name": "yoyo-pi",
+  "version": "0.1.0",
+  "description": "Kenx's personal Pi extensions package.",
+  "type": "module",
+  "keywords": [
+    "pi-package",
+    "pi-extension"
+  ],
+  "license": "MIT",
+  "pi": {
+    "extensions": [
+      "./extensions/clear-context.ts",
+      "./extensions/vim-mode.ts",
+      "./extensions/kenx-infra/index.ts",
+      "./extensions/plan-mode/index.ts"
+    ]
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-tui": "*",
+    "typebox": "*"
+  }
+}

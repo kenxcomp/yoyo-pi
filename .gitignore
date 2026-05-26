@@ -1,0 +1,14 @@
+node_modules/
+.DS_Store
+*.log
+.env
+.env.*
+!.env.example
+
+# Local pi/session scratch files
+.pi/
+.plan/
+.tmp/
+
+# Extension-local runtime state; packaged extensions store state under ~/.pi/agent/state instead.
+.kenx-infra-state.json
