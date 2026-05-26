@@ -5,13 +5,13 @@ Kenx's personal [pi](https://pi.dev) package. It bundles the extensions currentl
 ## Install
 
 ```bash
-pi install git:git@github.com:kenxcomp/yoyo-pi.git
+pi install git:git@github.com:kenxcomp/yoyo-pi.git@v0.1.1
 ```
 
 Temporary test without installing:
 
 ```bash
-pi -e git:git@github.com:kenxcomp/yoyo-pi.git
+pi -e git:git@github.com:kenxcomp/yoyo-pi.git@v0.1.1
 ```
 
 After installing this package, remove or move the old local copies under `~/.pi/agent/extensions/` to avoid duplicate slash commands.
@@ -27,6 +27,6 @@ After installing this package, remove or move the old local copies under `~/.pi/
 
 ## Development
 
-This package intentionally lists Pi core packages as `peerDependencies` because Pi provides them at runtime.
+This package intentionally lists Pi core packages as optional `peerDependencies` because Pi provides them at runtime.
 
 The `pi.extensions` manifest explicitly lists entrypoints so `extensions/plan-mode/sandbox.ts` is not auto-loaded as a normal extension; it is only loaded by the child plan-agent process.
