@@ -34,14 +34,16 @@ Interactive HTML preview: [open the status bar playground](https://htmlpreview.g
 ## Install
 
 ```bash
-pi install git:git@github.com:kenxcomp/yoyo-pi.git@v0.1.3
+pi install git:git@github.com:kenxcomp/yoyo-pi.git
 ```
 
 Temporary test without installing:
 
 ```bash
-pi -e git:git@github.com:kenxcomp/yoyo-pi.git@v0.1.3
+pi -e git:git@github.com:kenxcomp/yoyo-pi.git
 ```
+
+The unpinned Git URL follows `main` when you run `pi update`. Pin a tag only when you want a reproducible release, for example `git:git@github.com:kenxcomp/yoyo-pi.git@v0.1.3`.
 
 After installing this package, remove or move the old local copies under `~/.pi/agent/extensions/` to avoid duplicate slash commands.
 
