@@ -6,7 +6,7 @@ Kenx's personal [pi](https://pi.dev) package. It bundles the extensions currentl
 
 ### File tree overlay
 
-<img src="docs/previews/filetree.png" alt="File tree overlay preview" width="420">
+<img src="docs/previews/filetree.png" alt="File tree overlay preview" width="260">
 
 ### Choice pickers
 
