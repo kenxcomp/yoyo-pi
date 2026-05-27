@@ -25,6 +25,10 @@ Interactive HTML preview: [open the status bar playground](https://htmlpreview.g
 
 <img src="docs/previews/filetree.png" alt="File tree overlay preview" width="260">
 
+### Todo timeline sidebar
+
+<img src="docs/previews/todo-sidebar.png" alt="Todo timeline sidebar preview" width="360">
+
 ### Choice pickers
 
 <img src="docs/previews/single-choice.png" alt="Single choice picker preview" width="720">
