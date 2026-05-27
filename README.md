@@ -1,8 +1,25 @@
 # yoyo-pi
 
-Kenx's personal [pi](https://pi.dev) package. It bundles the extensions currently used from `~/.pi/agent/extensions` into one installable package.
+A polished extension pack for [pi](https://pi.dev) that makes the terminal coding-agent workflow faster, cleaner, and more ergonomic.
+
+This is Kenx's daily pi setup, packaged as a reusable GitHub install: Vim-style prompt editing, custom TUI themes and status bars, a right-side file tree overlay, interactive choice pickers, context snapshots, and a read-only planning mode.
+
+## Highlights
+
+- **Vim prompt editing** — toggle `/vim` for normal/insert/visual-style prompt control, with a status pill and external-editor fallback.
+- **Custom TUI chrome** — switch themes, full-screen background coverage, and eight status bar/input layouts with `/theme`, `/theme-bg`, and `/switch-statusbar`.
+- **File tree overlay** — open a right-side file picker with `/filetree` or `Ctrl+Shift+F` without leaving the TUI.
+- **Agent-friendly choice pickers** — `single_choice`, `multiple_choice`, and `choice_questions` give models structured ways to ask users for decisions.
+- **Context snapshots** — `/clear` saves the current branch context, then `/restore <name>` brings it back later.
+- **Plan mode** — `/plan` exposes a sandboxed `plan_agent` that writes implementation plans and todos under `.plan/`.
 
 ## Preview
+
+### Status bar & input variations
+
+<img src="docs/previews/status-bar.png" alt="Status bar and input variation preview" width="760">
+
+Interactive HTML preview: [open the status bar playground](https://raw.githack.com/kenxcomp/yoyo-pi/main/docs/previews/pi-tui-status-bar.html).
 
 ### File tree overlay
 
@@ -13,10 +30,6 @@ Kenx's personal [pi](https://pi.dev) package. It bundles the extensions currentl
 <img src="docs/previews/single-choice.png" alt="Single choice picker preview" width="720">
 
 <img src="docs/previews/multiple-choice.png" alt="Multiple choice picker preview" width="720">
-
-### Status bar variations
-
-Open the interactive HTML preview: [pi-TUI status bar](https://htmlpreview.github.io/?https://github.com/kenxcomp/yoyo-pi/blob/main/docs/previews/pi-tui-status-bar.html).
 
 ## Install
 
@@ -32,15 +45,15 @@ pi -e git:git@github.com:kenxcomp/yoyo-pi.git@v0.1.3
 
 After installing this package, remove or move the old local copies under `~/.pi/agent/extensions/` to avoid duplicate slash commands.
 
-## Included extensions
+## Commands and tools
 
-| Extension | Commands / tools | Notes |
+| Area | Commands / tools | What it adds |
 | --- | --- | --- |
-| `clear-context.ts` | `/clear`, `/restore <name>` | Save current branch context to `.tmp/<name>.jsonl` and restore it later. |
-| `vim-mode.ts` | `/vim [on\|off\|status]` | Vim-like modal prompt editor with external-editor fallback. |
-| `choice-picker.ts` | `single_choice`, `multiple_choice`, `choice_questions`, `/choice-demo [multi\|questions]` | Standard choice tools with inline-pill single select, one-column compact multi-select, and tabbed batched questions. |
-| `kenx-infra` | `/theme <paper\|light\|dark>`, `/theme-bg <true\|false>`, `/filetree`, `Ctrl+Shift+F`, `/switch-statusbar <1-8\|0>` | Themes, optional full-TUI background fill, right-side overlay file picker, and custom statusbar/input UI. Runtime preferences are stored under `~/.pi/agent/state/kenx-infra.json`. |
-| `plan-mode` | `/plan`, `plan_agent` | Read-only plan mode that delegates planning to the bundled `agents/plan-agent.md` through `sandbox.ts`. |
+| Context snapshots | `/clear`, `/restore <name>` | Save current branch context to `.tmp/<name>.jsonl` and restore it later. |
+| Vim prompt mode | `/vim [on\|off\|status]` | Vim-like modal prompt editor with external-editor fallback. |
+| Choice pickers | `single_choice`, `multiple_choice`, `choice_questions`, `/choice-demo [multi\|questions]` | Inline-pill single select, compact multi-select, and tabbed batched questions. |
+| TUI infrastructure | `/theme <paper\|light\|dark>`, `/theme-bg <true\|false>`, `/filetree`, `Ctrl+Shift+F`, `/switch-statusbar <1-8\|0>` | Themes, optional full-TUI background fill, right-side overlay file picker, and custom statusbar/input UI. Runtime preferences are stored under `~/.pi/agent/state/kenx-infra.json`. |
+| Plan mode | `/plan`, `plan_agent` | Read-only plan mode that delegates planning to the bundled `agents/plan-agent.md` through `sandbox.ts`. |
 
 ## Development
 

@@ -1,11 +1,15 @@
 {
   "name": "yoyo-pi",
   "version": "0.1.3",
-  "description": "Kenx's personal Pi extensions package.",
+  "description": "Polished pi extension pack: Vim prompt editing, choice pickers, themes, status bars, file tree, context snapshots, and plan mode.",
   "type": "module",
   "keywords": [
     "pi-package",
-    "pi-extension"
+    "pi-extension",
+    "coding-agent",
+    "terminal",
+    "tui",
+    "vim"
   ],
   "license": "MIT",
   "pi": {
