@@ -49,7 +49,13 @@ type FileTreeEntry = {
 	kind: "file" | "dir" | "parent" | "symlink" | "other";
 };
 
+type KenxSidebarBridge = {
+	isFileTreeOpen(): boolean;
+	closeFileTree(): boolean;
+};
+
 let closeFileTree: (() => void) | null = null;
+let installedKenxSidebarBridge: KenxSidebarBridge | undefined;
 let installedKenxStatusbarBridge: KenxStatusbarBridge | undefined;
 
 const THEME_BG_WIDGET_KEY = "kenx-theme-bg-capture";
@@ -104,6 +110,7 @@ const defaultGitStatus: GitStatusSummary = {
 };
 
 const VIM_BRIDGE_KEY = Symbol.for("yoyo-pi.vim-mode.bridge");
+const KENX_SIDEBAR_BRIDGE_KEY = Symbol.for("yoyo-pi.kenx-infra.sidebar");
 const KENX_STATUSBAR_BRIDGE_KEY = Symbol.for("yoyo-pi.kenx-statusbar.bridge");
 
 const statusbarVariantLabels: Record<StatusbarVariant, string> = {
@@ -187,6 +194,7 @@ const bgColorKeys = [
 ] as const satisfies readonly ThemeBgKey[];
 
 export default function (pi: ExtensionAPI) {
+	installKenxSidebarBridge();
 	installKenxStatusbarBridge();
 
 	pi.on("resources_discover", () => ({
@@ -230,6 +238,7 @@ export default function (pi: ExtensionAPI) {
 		setThemeBgRuntimeEnabled(false);
 		uninstallThemeBgPatch(false);
 		statusbarState.requestRender = undefined;
+		uninstallKenxSidebarBridge();
 		uninstallKenxStatusbarBridge();
 	});
 
@@ -819,6 +828,25 @@ function setKnownExtensionStatus(key: string, text: string | undefined): void {
 	const cleaned = text ? sanitizeStatusText(text) : "";
 	statusbarState.extensionStatuses = cleaned ? [...withoutVim, cleaned] : withoutVim;
 	requestStatusbarRender();
+}
+
+function installKenxSidebarBridge(): void {
+	const bridge: KenxSidebarBridge = {
+		isFileTreeOpen: () => Boolean(closeFileTree),
+		closeFileTree: () => {
+			if (!closeFileTree) return false;
+			closeFileTree();
+			return true;
+		},
+	};
+	installedKenxSidebarBridge = bridge;
+	(globalThis as Record<symbol, KenxSidebarBridge | undefined>)[KENX_SIDEBAR_BRIDGE_KEY] = bridge;
+}
+
+function uninstallKenxSidebarBridge(): void {
+	const globalBridge = globalThis as Record<symbol, KenxSidebarBridge | undefined>;
+	if (globalBridge[KENX_SIDEBAR_BRIDGE_KEY] === installedKenxSidebarBridge) delete globalBridge[KENX_SIDEBAR_BRIDGE_KEY];
+	installedKenxSidebarBridge = undefined;
 }
 
 function installKenxStatusbarBridge(): void {

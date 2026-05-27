@@ -2,13 +2,13 @@
 
 A polished extension pack for [pi](https://pi.dev) that makes the terminal coding-agent workflow faster, cleaner, and more ergonomic.
 
-This is Kenx's daily pi setup, packaged as a reusable GitHub install: Vim-style prompt editing, custom TUI themes and status bars, a right-side file tree overlay, interactive choice pickers, context snapshots, and a read-only planning mode.
+This is Kenx's daily pi setup, packaged as a reusable GitHub install: Vim-style prompt editing, custom TUI themes and status bars, right-side file/todo overlays, interactive choice pickers, context snapshots, and a read-only planning mode.
 
 ## Highlights
 
 - **Vim prompt editing** — toggle `/vim` for normal/insert/visual-style prompt control, with a status pill and external-editor fallback.
 - **Custom TUI chrome** — switch themes, full-screen background coverage, and eight status bar/input layouts with `/theme`, `/theme-bg`, and `/switch-statusbar`.
-- **File tree overlay** — open a right-side file picker with `/filetree` or `Ctrl+Shift+F` without leaving the TUI.
+- **File tree / todo overlays** — open a right-side file picker with `/filetree` or `Ctrl+Shift+F`; monitor `.plan/*.jsonl` todos with `/todo` or `Ctrl+Shift+T`.
 - **Agent-friendly choice pickers** — `single_choice`, `multiple_choice`, and `choice_questions` give models structured ways to ask users for decisions.
 - **Context snapshots** — `/clear` saves the current branch context, then `/restore <name>` brings it back later.
 - **Plan mode** — `/plan` exposes a sandboxed `plan_agent` that writes implementation plans and todos under `.plan/`.
@@ -55,7 +55,7 @@ After installing this package, remove or move the old local copies under `~/.pi/
 | Vim prompt mode | `/vim [on\|off\|status]` | Vim-like modal prompt editor with external-editor fallback. |
 | Choice pickers | `single_choice`, `multiple_choice`, `choice_questions`, `/choice-demo [multi\|questions]` | Inline-pill single select, compact multi-select, and tabbed batched questions. |
 | TUI infrastructure | `/theme <paper\|light\|dark>`, `/theme-bg <true\|false>`, `/filetree`, `Ctrl+Shift+F`, `/switch-statusbar <1-8\|0>` | Themes, optional full-TUI background fill, right-side overlay file picker, and custom statusbar/input UI. Runtime preferences are stored under `~/.pi/agent/state/kenx-infra.json`. |
-| Plan mode | `/plan`, `plan_agent` | Read-only plan mode that delegates planning to the bundled `agents/plan-agent.md` through `sandbox.ts`. |
+| Plan/todo workflow | `/plan`, `/todo <goal>`, `/todo [show\|off\|status]`, `Ctrl+Shift+T`, `plan_agent` | Read-only plan mode delegates planning to `agents/plan-agent.md`; todo mode writes/monitors `.plan/todo.jsonl` in a right-side timeline sidebar and asks the agent to keep statuses updated while executing. |
 
 ## Development
 

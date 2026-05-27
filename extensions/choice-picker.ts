@@ -1182,8 +1182,17 @@ function renderQuestionnaireResult(
 	return new Text(lines.join("\n"), 0, 0);
 }
 
+function toolAlreadyRegistered(pi: ExtensionAPI, name: string): boolean {
+	try {
+		return pi.getAllTools().some((tool) => tool.name === name);
+	} catch {
+		return false;
+	}
+}
+
 export default function choicePickerExtension(pi: ExtensionAPI) {
-	pi.registerTool({
+	if (!toolAlreadyRegistered(pi, "single_choice")) {
+		pi.registerTool({
 		name: "single_choice",
 		label: "Single Choice",
 		description:
@@ -1211,9 +1220,11 @@ export default function choicePickerExtension(pi: ExtensionAPI) {
 		renderResult(result, _options, theme) {
 			return renderChoiceResult(result, theme);
 		},
-	});
+		});
+	}
 
-	pi.registerTool({
+	if (!toolAlreadyRegistered(pi, "multiple_choice")) {
+		pi.registerTool({
 		name: "multiple_choice",
 		label: "Multiple Choice",
 		description:
@@ -1242,9 +1253,11 @@ export default function choicePickerExtension(pi: ExtensionAPI) {
 		renderResult(result, _options, theme) {
 			return renderChoiceResult(result, theme);
 		},
-	});
+		});
+	}
 
-	pi.registerTool({
+	if (!toolAlreadyRegistered(pi, "choice_questions")) {
+		pi.registerTool({
 		name: "choice_questions",
 		label: "Choice Questions",
 		description:
@@ -1281,7 +1294,8 @@ export default function choicePickerExtension(pi: ExtensionAPI) {
 		renderResult(result, _options, theme) {
 			return renderQuestionnaireResult(result, theme);
 		},
-	});
+		});
+	}
 
 	pi.registerCommand("choice-demo", {
 		description: "Preview the single_choice, multiple_choice, and choice_questions pickers",
