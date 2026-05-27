@@ -296,57 +296,66 @@ export default function (pi: ExtensionAPI) {
 	});
 
 	pi.registerCommand("filetree", {
-		description: "Toggle the right-side file tree picker",
+		description: "Toggle the right-side overlay file tree picker",
 		handler: async (_args: string, ctx: ExtensionCommandContext) => {
-			if (!ctx.hasUI) return;
-
-			if (closeFileTree) {
-				closeFileTree();
-				return;
-			}
-
-			try {
-				const result = await ctx.ui.custom<FileTreeResult>(
-					(tui, theme, _keybindings, done) => {
-						let closed = false;
-						const finish = (value: FileTreeResult) => {
-							if (closed) return;
-							closed = true;
-							done(value);
-						};
-
-						closeFileTree = () => finish({ type: "cancel" });
-
-						return new FileTreePanel({
-							tui,
-							theme,
-							basePath: resolve(ctx.cwd),
-							done: finish,
-						});
-					},
-					{
-						overlay: true,
-						overlayOptions: {
-							anchor: "right-center",
-							width: "28%",
-							minWidth: 32,
-							maxHeight: "90%",
-							margin: { right: 0 },
-						},
-						onHandle: (handle) => {
-							handle.focus();
-						},
-					},
-				);
-
-				if (result.type === "select") {
-					ctx.ui.pasteToEditor(`@${result.path}`);
-				}
-			} finally {
-				closeFileTree = null;
-			}
+			await toggleFileTree(ctx);
 		},
 	});
+
+	pi.registerShortcut("ctrl+shift+f", {
+		description: "Toggle the right-side overlay file tree picker",
+		handler: toggleFileTree,
+	});
+}
+
+async function toggleFileTree(ctx: ExtensionContext): Promise<void> {
+	if (!ctx.hasUI) return;
+
+	if (closeFileTree) {
+		closeFileTree();
+		return;
+	}
+
+	try {
+		const result = await ctx.ui.custom<FileTreeResult>(
+			(tui, theme, _keybindings, done) => {
+				let closed = false;
+				const finish = (value: FileTreeResult) => {
+					if (closed) return;
+					closed = true;
+					done(value);
+				};
+
+				closeFileTree = () => finish({ type: "cancel" });
+
+				return new FileTreePanel({
+					tui,
+					theme,
+					basePath: resolve(ctx.cwd),
+					done: finish,
+				});
+			},
+			{
+				overlay: true,
+				overlayOptions: {
+					anchor: "right-center",
+					width: "28%",
+					minWidth: 32,
+					maxHeight: "90%",
+					margin: { right: 0 },
+				},
+				onHandle: (handle) => {
+					handle.focus();
+				},
+			},
+		);
+
+		if (result.type === "select") {
+			ctx.ui.pasteToEditor(`@${result.path}`);
+		}
+	} finally {
+		closeFileTree = null;
+	}
 }
 
 function isKenxThemeName(value: unknown): value is KenxThemeName {
@@ -1298,7 +1307,7 @@ class FileTreePanel {
 	}
 
 	handleInput(data: string): void {
-		if (matchesKey(data, "escape") || matchesKey(data, "ctrl+c")) {
+		if (matchesKey(data, "escape") || matchesKey(data, "ctrl+c") || matchesKey(data, "ctrl+shift+f")) {
 			this.close({ type: "cancel" });
 			return;
 		}
@@ -1385,7 +1394,7 @@ class FileTreePanel {
 
 		const position = this.entries.length > 0 ? `${this.selected + 1}/${this.entries.length}` : "0/0";
 		lines.push(border("├") + border("─".repeat(innerW)) + border("┤"));
-		lines.push(row(` ${th.fg("dim", "↑↓ select • Enter open/insert • Esc close")} ${th.fg("accent", position)}`));
+		lines.push(row(` ${th.fg("dim", "↑↓ select • Enter insert • →/l open • Ctrl+Shift+F close")} ${th.fg("accent", position)}`));
 		lines.push(border(`╰${"─".repeat(innerW)}╯`));
 		return lines;
 	}
@@ -1450,8 +1459,8 @@ class FileTreePanel {
 		const entry = this.entries[this.selected];
 		if (!entry) return;
 
-		if (entry.kind === "parent" || entry.kind === "dir") {
-			await this.loadDirectory(entry.fullPath);
+		if (entry.kind === "parent") {
+			await this.goParent();
 			return;
 		}
 
