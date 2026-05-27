@@ -2,6 +2,22 @@
 
 Kenx's personal [pi](https://pi.dev) package. It bundles the extensions currently used from `~/.pi/agent/extensions` into one installable package.
 
+## Preview
+
+### File tree overlay
+
+<img src="docs/previews/filetree.png" alt="File tree overlay preview" width="420">
+
+### Choice pickers
+
+<img src="docs/previews/single-choice.png" alt="Single choice picker preview" width="720">
+
+<img src="docs/previews/multiple-choice.png" alt="Multiple choice picker preview" width="720">
+
+### Status bar variations
+
+Open the interactive HTML preview: [pi-TUI status bar](https://htmlpreview.github.io/?https://github.com/kenxcomp/yoyo-pi/blob/main/docs/previews/pi-tui-status-bar.html).
+
 ## Install
 
 ```bash
