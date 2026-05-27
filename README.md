@@ -1,5 +1,10 @@
 # yoyo-pi
 
+<p align="right">
+  <a href="README.md"><img src="https://img.shields.io/badge/Language-English-blue" alt="English"></a>
+  <a href="README.zh-CN.md"><img src="https://img.shields.io/badge/%E8%AF%AD%E8%A8%80-%E7%AE%80%E4%BD%93%E4%B8%AD%E6%96%87-brightgreen" alt="简体中文"></a>
+</p>
+
 A polished extension pack for [pi](https://pi.dev) that makes the terminal coding-agent workflow faster, cleaner, and more ergonomic.
 
 This is Kenx's daily pi setup, packaged as a reusable GitHub install: Vim-style prompt editing, custom TUI themes and status bars, right-side file/todo overlays, interactive choice pickers, context snapshots, and a read-only planning mode.
