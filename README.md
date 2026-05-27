@@ -19,7 +19,7 @@ This is Kenx's daily pi setup, packaged as a reusable GitHub install: Vim-style 
 
 <img src="docs/previews/status-bar.png" alt="Status bar and input variation preview" width="760">
 
-Interactive HTML preview: [open the status bar playground](https://raw.githack.com/kenxcomp/yoyo-pi/main/docs/previews/pi-tui-status-bar.html).
+Interactive HTML preview: [open the status bar playground](https://htmlpreview.github.io/?https://github.com/kenxcomp/yoyo-pi/blob/main/docs/previews/pi-tui-status-bar.html).
 
 ### File tree overlay
 
