@@ -5,13 +5,13 @@ Kenx's personal [pi](https://pi.dev) package. It bundles the extensions currentl
 ## Install
 
 ```bash
-pi install git:git@github.com:kenxcomp/yoyo-pi.git@v0.1.1
+pi install git:git@github.com:kenxcomp/yoyo-pi.git@v0.1.2
 ```
 
 Temporary test without installing:
 
 ```bash
-pi -e git:git@github.com:kenxcomp/yoyo-pi.git@v0.1.1
+pi -e git:git@github.com:kenxcomp/yoyo-pi.git@v0.1.2
 ```
 
 After installing this package, remove or move the old local copies under `~/.pi/agent/extensions/` to avoid duplicate slash commands.
