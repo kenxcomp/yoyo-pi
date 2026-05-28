@@ -18,6 +18,7 @@
       "./extensions/vim-mode.ts",
       "./extensions/choice-picker.ts",
       "./extensions/kenx-infra/index.ts",
+      "./extensions/gr0k-hack/index.ts",
       "./extensions/plan-mode/index.ts"
     ]
   },

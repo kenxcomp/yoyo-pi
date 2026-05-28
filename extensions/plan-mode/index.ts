@@ -36,6 +36,14 @@ const DEFAULT_PLAN_AGENT_TOOLS = [
 ];
 const MAX_PARENT_SYSTEM_PROMPT_CHARS = 100_000;
 const MAX_STDERR_CHARS = 20_000;
+const MAX_PLAN_PREVIEW_CHARS = 80_000;
+const MAX_PLAN_HANDOFF_CHARS = 120_000;
+const PLAN_PREVIEW_CUSTOM_TYPE = "plan-mode-exit-plan-preview";
+const PLAN_HANDOFF_CUSTOM_TYPE = "plan-mode-exit-handoff";
+const PLAN_CONTEXT_RESET_CUSTOM_TYPE = "plan-mode-context-reset";
+const PLAN_EXIT_EXECUTE_OPTION = "plan没问题，允许退出plan mode，开始执行";
+const PLAN_EXIT_SHELVE_OPTION = "允许退出plan mode，先搁置";
+const PLAN_EXIT_REVISE_OPTION = "不允许退出，需要修改：{修改意见}";
 
 const EXTENSION_DIR = path.dirname(fileURLToPath(import.meta.url));
 const SANDBOX_EXTENSION_PATH = path.join(EXTENSION_DIR, "sandbox.ts");
@@ -70,6 +78,40 @@ interface PlanAgentRunResult {
 	model?: string;
 	stopReason?: string;
 	errorMessage?: string;
+}
+
+type PlanReviewSource = "command" | "tool";
+type PlanExitDecision = "execute" | "shelve" | "explicit";
+
+interface PlanReviewRequest {
+	id: string;
+	source: PlanReviewSource;
+	prompt: string;
+	planPath: string;
+	absolutePlanPath: string;
+	todoPath: string;
+	absoluteTodoPath: string;
+	createdAt: string;
+	result: PlanAgentRunResult;
+}
+
+interface PlanContentRead {
+	content: string;
+	truncated: boolean;
+	error?: string;
+}
+
+interface PlanExitHandoff {
+	id: string;
+	decision: PlanExitDecision;
+	originalPrompt: string;
+	planPath: string;
+	absolutePlanPath: string;
+	todoPath: string;
+	absoluteTodoPath: string;
+	planContent: string;
+	planContentTruncated: boolean;
+	createdAt: string;
 }
 
 type PlanTodoStatus = "pending" | "in_progress" | "done" | "blocked" | "skipped" | "cancelled" | "failed" | string;
@@ -429,8 +471,16 @@ async function runPlanAgent(ctx: ExtensionContext, options: PlanAgentRunOptions)
 	}
 }
 
+function isPlanAgentProcessOk(result: PlanAgentRunResult): boolean {
+	return result.exitCode === 0 && !result.errorMessage && result.stopReason !== "error" && result.stopReason !== "aborted";
+}
+
+function isPlanAgentRunOk(result: PlanAgentRunResult): boolean {
+	return isPlanAgentProcessOk(result) && result.planExists && result.todoExists;
+}
+
 function formatPlanAgentResult(result: PlanAgentRunResult): string {
-	const processOk = result.exitCode === 0 && !result.errorMessage && result.stopReason !== "error" && result.stopReason !== "aborted";
+	const processOk = isPlanAgentProcessOk(result);
 	const outputsOk = result.planExists && result.todoExists;
 	const ok = processOk && outputsOk;
 	const status = processOk
@@ -445,6 +495,85 @@ function formatPlanAgentResult(result: PlanAgentRunResult): string {
 	if (!ok && result.errorMessage) parts.push(`Error: ${result.errorMessage}`);
 	if (!ok && result.stderr) parts.push(`stderr:\n${result.stderr}`);
 	return parts.join("\n\n");
+}
+
+function createPlanReview(prompt: string, result: PlanAgentRunResult, source: PlanReviewSource): PlanReviewRequest {
+	return {
+		id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+		source,
+		prompt,
+		planPath: result.planPath,
+		absolutePlanPath: result.absolutePlanPath,
+		todoPath: result.todoPath,
+		absoluteTodoPath: result.absoluteTodoPath,
+		createdAt: new Date().toISOString(),
+		result,
+	};
+}
+
+function safeContextIsIdle(ctx: ExtensionContext): boolean {
+	try {
+		return ctx.isIdle();
+	} catch {
+		return true;
+	}
+}
+
+function sendPlanCustomMessage(
+	pi: ExtensionAPI,
+	_ctx: ExtensionContext,
+	message: { customType: string; content: string; display: boolean; details?: Record<string, unknown> },
+	options: { triggerTurn?: boolean } = {},
+): void {
+	pi.sendMessage(message as any, { triggerTurn: options.triggerTurn ?? false } as any);
+}
+
+function sendPlanUserMessage(pi: ExtensionAPI, ctx: ExtensionContext, content: string): void {
+	if (safeContextIsIdle(ctx)) pi.sendUserMessage(content);
+	else pi.sendUserMessage(content, { deliverAs: "followUp" });
+}
+
+async function readPlanContent(filePath: string, maxChars: number): Promise<PlanContentRead> {
+	try {
+		const raw = await fsp.readFile(filePath, "utf-8");
+		if (raw.length <= maxChars) return { content: raw, truncated: false };
+		return {
+			content: `${raw.slice(0, maxChars)}\n\n[... truncated ${raw.length - maxChars} characters; open the plan file for the full content ...]`,
+			truncated: true,
+		};
+	} catch (error) {
+		return {
+			content: "",
+			truncated: false,
+			error: error instanceof Error ? error.message : String(error),
+		};
+	}
+}
+
+function buildPlanPreviewContent(review: PlanReviewRequest, plan: PlanContentRead): string {
+	const header = `# Plan preview before exiting plan mode\n\nPlan file: \`${review.planPath}\`\nTodo file: \`${review.todoPath}\``;
+	if (plan.error) {
+		return `${header}\n\nCould not read the plan file before exit: ${plan.error}`;
+	}
+	const truncation = plan.truncated
+		? `\n\n> Preview truncated. Open \`${review.planPath}\` for the full plan.`
+		: "";
+	return `${header}${truncation}\n\n---\n\n${plan.content || "(plan file is empty)"}`;
+}
+
+function buildPlanHandoffContent(handoff: PlanExitHandoff): string {
+	const truncation = handoff.planContentTruncated
+		? "\n\nNote: The plan content below is truncated; use the plan file for the complete version."
+		: "";
+	return `[PLAN MODE EXIT HANDOFF]\nThe planning conversation before this handoff was intentionally removed from future LLM context. Use only this original prompt, plan, todo path, and newer messages.\n\n## Original user prompt\n${handoff.originalPrompt}\n\n## Plan file\n${handoff.planPath}\n\n## Todo file\n${handoff.todoPath}${truncation}\n\n## Plan content\n${handoff.planContent || "(plan file is empty or unavailable)"}`;
+}
+
+function buildPlanExecuteKickoffPrompt(handoff: PlanExitHandoff): string {
+	return `Execute the approved plan now.\n\nOriginal user prompt:\n${handoff.originalPrompt}\n\nPlan file: ${handoff.planPath}\nTodo JSONL: ${handoff.todoPath}\n\nUse the plan-mode exit handoff context as the source of truth. Keep ${handoff.todoPath} updated as you work: set each todo to in_progress before starting it, done with completedAt after finishing it, and blocked with an explanation if you cannot proceed.`;
+}
+
+function buildPlanRevisePrompt(review: PlanReviewRequest, feedback: string): string {
+	return `The user did not allow exiting plan mode and requested changes to the plan.\n\nOriginal planning prompt:\n${review.prompt}\n\nCurrent plan file: ${review.planPath}\nTodo JSONL: ${review.todoPath}\n\nUser modification feedback:\n${feedback}\n\nStay in plan mode. Call plan_agent again with outputPath \`${review.planPath}\`, incorporate the feedback, and rewrite ${review.todoPath} to match the revised plan. Do not implement the plan.`;
 }
 
 const PlanAgentParams = Type.Object({
@@ -1308,6 +1437,9 @@ function closeTodoSidebarIfOpen(): boolean {
 export default function planModeExtension(pi: ExtensionAPI): void {
 	let planModeEnabled = false;
 	let previousTools: string[] | null = null;
+	let latestPlanReview: PlanReviewRequest | undefined;
+	let pendingPlanReview: PlanReviewRequest | undefined;
+	let planReviewInProgress = false;
 
 	pi.registerFlag("plan", {
 		description: "Start in plan mode and expose the plan_agent tool",
@@ -1331,19 +1463,163 @@ export default function planModeExtension(pi: ExtensionAPI): void {
 		}
 	}
 
-	async function exitPlanMode(
-		ctx: ExtensionContext,
-		options: { silent?: boolean; openTodoSidebar?: boolean } = {},
-	): Promise<void> {
+	function clearPlanReviewState(): void {
+		latestPlanReview = undefined;
+		pendingPlanReview = undefined;
+	}
+
+	function rememberPlanReview(prompt: string, result: PlanAgentRunResult, source: PlanReviewSource): PlanReviewRequest | undefined {
+		if (!isPlanAgentRunOk(result)) {
+			clearPlanReviewState();
+			return undefined;
+		}
+		const review = createPlanReview(prompt, result, source);
+		latestPlanReview = review;
+		return review;
+	}
+
+	function restorePlanModeState(ctx: ExtensionContext, silent = false): void {
 		planModeEnabled = false;
 		if (previousTools) pi.setActiveTools(previousTools);
 		previousTools = null;
 		updateStatus(ctx);
-		if (!options.silent && ctx.hasUI) ctx.ui.notify("Plan mode disabled. Previous tools restored.", "info");
-		if (options.openTodoSidebar !== false) await openTodoSidebar(ctx);
+		if (!silent && ctx.hasUI) ctx.ui.notify("Plan mode disabled. Previous tools restored.", "info");
+	}
+
+	async function createPlanExitHandoff(
+		review: PlanReviewRequest,
+		decision: PlanExitDecision,
+	): Promise<PlanExitHandoff> {
+		const plan = await readPlanContent(review.absolutePlanPath, MAX_PLAN_HANDOFF_CHARS);
+		return {
+			id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+			decision,
+			originalPrompt: review.prompt,
+			planPath: review.planPath,
+			absolutePlanPath: review.absolutePlanPath,
+			todoPath: review.todoPath,
+			absoluteTodoPath: review.absoluteTodoPath,
+			planContent: plan.error ? `(Could not read plan file: ${plan.error})` : plan.content,
+			planContentTruncated: plan.truncated,
+			createdAt: new Date().toISOString(),
+		};
+	}
+
+	async function exitPlanMode(
+		ctx: ExtensionContext,
+		options: { silent?: boolean; openTodoSidebar?: boolean; initialTodoPath?: string; handoff?: PlanExitHandoff } = {},
+	): Promise<void> {
+		restorePlanModeState(ctx, options.silent);
+		pendingPlanReview = undefined;
+		latestPlanReview = undefined;
+		if (options.handoff) {
+			sendPlanCustomMessage(pi, ctx, {
+				customType: PLAN_HANDOFF_CUSTOM_TYPE,
+				content: buildPlanHandoffContent(options.handoff),
+				display: false,
+				details: {
+					id: options.handoff.id,
+					decision: options.handoff.decision,
+					originalPrompt: options.handoff.originalPrompt,
+					planPath: options.handoff.planPath,
+					todoPath: options.handoff.todoPath,
+					createdAt: options.handoff.createdAt,
+				},
+			});
+		}
+		if (options.openTodoSidebar !== false) {
+			await openTodoSidebar(ctx, { initialPath: options.initialTodoPath ?? options.handoff?.absoluteTodoPath });
+		}
+	}
+
+	async function displayPlanForExitRequest(ctx: ExtensionContext, review: PlanReviewRequest): Promise<PlanContentRead> {
+		const plan = await readPlanContent(review.absolutePlanPath, MAX_PLAN_PREVIEW_CHARS);
+		sendPlanCustomMessage(pi, ctx, {
+			customType: PLAN_PREVIEW_CUSTOM_TYPE,
+			content: buildPlanPreviewContent(review, plan),
+			display: true,
+			details: {
+				id: review.id,
+				planPath: review.planPath,
+				todoPath: review.todoPath,
+				truncated: plan.truncated,
+				error: plan.error,
+			},
+		});
+		if (plan.error && ctx.hasUI) ctx.ui.notify(`Could not read plan before exit: ${plan.error}`, "warning");
+		return plan;
+	}
+
+	async function exitPlanModeWithLatestPlan(
+		ctx: ExtensionContext,
+		options: { silent?: boolean; openTodoSidebar?: boolean } = {},
+	): Promise<void> {
+		const review = latestPlanReview;
+		if (!review) {
+			await exitPlanMode(ctx, options);
+			return;
+		}
+		await displayPlanForExitRequest(ctx, review);
+		const handoff = await createPlanExitHandoff(review, "explicit");
+		await exitPlanMode(ctx, { ...options, initialTodoPath: review.absoluteTodoPath, handoff });
+	}
+
+	async function requestPlanExitDecision(ctx: ExtensionContext, review: PlanReviewRequest): Promise<void> {
+		if (planReviewInProgress) return;
+		planReviewInProgress = true;
+		try {
+			await displayPlanForExitRequest(ctx, review);
+			if (!ctx.hasUI) {
+				sendPlanCustomMessage(pi, ctx, {
+					customType: "plan-mode-exit-decision-skipped",
+					content: "Plan mode exit decision skipped because no interactive UI is available. Plan mode remains enabled.",
+					display: true,
+					details: { planPath: review.planPath, todoPath: review.todoPath },
+				});
+				return;
+			}
+
+			const choice = await ctx.ui.select("Plan 已生成，是否退出 plan mode？", [
+				PLAN_EXIT_EXECUTE_OPTION,
+				PLAN_EXIT_SHELVE_OPTION,
+				PLAN_EXIT_REVISE_OPTION,
+			]);
+
+			if (choice === PLAN_EXIT_EXECUTE_OPTION) {
+				const handoff = await createPlanExitHandoff(review, "execute");
+				todoWorkflowActive = true;
+				await exitPlanMode(ctx, { initialTodoPath: review.absoluteTodoPath, handoff });
+				sendPlanUserMessage(pi, ctx, buildPlanExecuteKickoffPrompt(handoff));
+				return;
+			}
+
+			if (choice === PLAN_EXIT_SHELVE_OPTION) {
+				const handoff = await createPlanExitHandoff(review, "shelve");
+				todoWorkflowActive = false;
+				await exitPlanMode(ctx, { initialTodoPath: review.absoluteTodoPath, handoff });
+				return;
+			}
+
+			if (choice === PLAN_EXIT_REVISE_OPTION) {
+				const feedback = (await ctx.ui.editor("请输入 plan 修改意见", ""))?.trim() ?? "";
+				if (!feedback) {
+					ctx.ui.notify("未输入修改意见，继续保持 plan mode。", "info");
+					return;
+				}
+				pendingPlanReview = undefined;
+				sendPlanUserMessage(pi, ctx, buildPlanRevisePrompt(review, feedback));
+				return;
+			}
+
+			ctx.ui.notify("已取消退出 plan mode，继续保持 plan mode。", "info");
+		} finally {
+			planReviewInProgress = false;
+			updateStatus(ctx);
+		}
 	}
 
 	async function spawnFromCommand(prompt: string, ctx: ExtensionContext, outputPath?: string): Promise<void> {
+		clearPlanReviewState();
 		try {
 			if (ctx.hasUI) ctx.ui.setStatus("plan-agent", ctx.ui.theme.fg("accent", "plan-agent…"));
 			const result = await runPlanAgent(ctx, {
@@ -1380,8 +1656,11 @@ export default function planModeExtension(pi: ExtensionAPI): void {
 					outputsOk ? "info" : "warning",
 				);
 			}
+			const review = rememberPlanReview(prompt, result, "command");
 			if (result.todoExists) await openTodoSidebar(ctx, { initialPath: result.absoluteTodoPath });
+			if (review) await requestPlanExitDecision(ctx, review);
 		} catch (error) {
+			clearPlanReviewState();
 			const message = error instanceof Error ? error.message : String(error);
 			pi.sendMessage(
 				{ customType: "plan-agent-result", content: `Plan agent failed: ${message}`, display: true },
@@ -1399,7 +1678,7 @@ export default function planModeExtension(pi: ExtensionAPI): void {
 		handler: async (args, ctx) => {
 			const raw = args.trim();
 			if (/^(off|exit|disable|stop)$/i.test(raw)) {
-				await exitPlanMode(ctx);
+				await exitPlanModeWithLatestPlan(ctx);
 				return;
 			}
 
@@ -1419,7 +1698,7 @@ export default function planModeExtension(pi: ExtensionAPI): void {
 					"Exit plan mode",
 				]);
 				if (choice === "Exit plan mode") {
-					await exitPlanMode(ctx);
+					await exitPlanModeWithLatestPlan(ctx);
 					return;
 				}
 				if (choice === "Spawn plan-agent now") {
@@ -1471,11 +1750,20 @@ export default function planModeExtension(pi: ExtensionAPI): void {
 			}
 
 			await ctx.waitForIdle();
-			if (planModeEnabled) await exitPlanMode(ctx, { silent: true, openTodoSidebar: false });
+			if (planModeEnabled) {
+				restorePlanModeState(ctx, true);
+				clearPlanReviewState();
+			}
+			sendPlanCustomMessage(pi, ctx, {
+				customType: PLAN_CONTEXT_RESET_CUSTOM_TYPE,
+				content: "Starting a new /todo workflow. Ignore any earlier plan-mode handoff context.",
+				display: false,
+				details: { reason: "todo-command", goal: raw, createdAt: new Date().toISOString() },
+			});
 			await fsp.mkdir(path.resolve(ctx.cwd, PLAN_DIR), { recursive: true });
 			todoWorkflowActive = true;
 			await openTodoSidebar(ctx);
-			pi.sendUserMessage(buildTodoCommandPrompt(raw));
+			sendPlanUserMessage(pi, ctx, buildTodoCommandPrompt(raw));
 		},
 	});
 
@@ -1495,6 +1783,8 @@ export default function planModeExtension(pi: ExtensionAPI): void {
 		promptGuidelines: [
 			"Use plan_agent in plan mode when the user asks for a written implementation plan or when a planning task needs isolated research.",
 			"The plan_agent tool writes markdown plans and .plan/todo.jsonl todos only under .plan/ and should not be used for implementation.",
+			"After plan_agent succeeds, the parent plan-mode extension will display the plan, ask the user whether to execute, shelve, or revise it, and prune context to the original prompt plus plan when exit is approved.",
+			"If the user asks to revise the plan after review, call plan_agent again with the same outputPath and do not implement until the parent extension exits plan mode.",
 		],
 		parameters: PlanAgentParams,
 		async execute(_toolCallId, params, signal, onUpdate, ctx) {
@@ -1505,6 +1795,7 @@ export default function planModeExtension(pi: ExtensionAPI): void {
 				};
 			}
 
+			clearPlanReviewState();
 			const result = await runPlanAgent(ctx, {
 				prompt: params.prompt,
 				outputPath: params.outputPath,
@@ -1516,6 +1807,8 @@ export default function planModeExtension(pi: ExtensionAPI): void {
 					}),
 			});
 
+			const review = rememberPlanReview(params.prompt, result, "tool");
+			pendingPlanReview = review;
 			if (result.todoExists) await openTodoSidebar(ctx, { initialPath: result.absoluteTodoPath });
 
 			return {
@@ -1528,6 +1821,7 @@ export default function planModeExtension(pi: ExtensionAPI): void {
 					exitCode: result.exitCode,
 					model: result.model,
 					stopReason: result.stopReason,
+					exitReviewPending: Boolean(review),
 				},
 			};
 		},
@@ -1554,26 +1848,55 @@ export default function planModeExtension(pi: ExtensionAPI): void {
 		return undefined;
 	});
 
+	pi.on("agent_end", async (_event, ctx) => {
+		const review = pendingPlanReview;
+		if (!review || !planModeEnabled) return;
+		pendingPlanReview = undefined;
+		await requestPlanExitDecision(ctx, review);
+	});
+
 	pi.on("context", async (event) => {
+		const shouldDropPlanUiMessage = (customType: unknown): boolean =>
+			customType === "plan-mode-context" ||
+			customType === PLAN_PREVIEW_CUSTOM_TYPE ||
+			customType === PLAN_CONTEXT_RESET_CUSTOM_TYPE ||
+			customType === "plan-mode-exit-decision-skipped";
+
 		if (planModeEnabled) {
 			return {
-				messages: event.messages.filter((message) => (message as any).customType !== "todo-sidebar-context"),
+				messages: event.messages.filter((message) => {
+					const customType = (message as any).customType;
+					if (customType === "todo-sidebar-context" || customType === PLAN_HANDOFF_CUSTOM_TYPE) return false;
+					return !shouldDropPlanUiMessage(customType);
+				}),
 			};
 		}
+
+		let lastHandoffIndex = -1;
+		let lastResetIndex = -1;
+		for (let i = event.messages.length - 1; i >= 0; i--) {
+			const customType = (event.messages[i] as any).customType;
+			if (lastHandoffIndex < 0 && customType === PLAN_HANDOFF_CUSTOM_TYPE) lastHandoffIndex = i;
+			if (lastResetIndex < 0 && customType === PLAN_CONTEXT_RESET_CUSTOM_TYPE) lastResetIndex = i;
+			if (lastHandoffIndex >= 0 && lastResetIndex >= 0) break;
+		}
+
+		const startIndex = lastHandoffIndex >= 0 && lastHandoffIndex > lastResetIndex ? lastHandoffIndex : lastResetIndex >= 0 ? lastResetIndex + 1 : 0;
+		const scopedMessages = startIndex > 0 ? event.messages.slice(startIndex) : event.messages;
 		const keepTodoContext = (todoWorkflowActive || Boolean(closeTodoSidebar)) && Boolean(todoSnapshotContext(latestTodoSnapshot));
 		let lastTodoContextIndex = -1;
 		if (keepTodoContext) {
-			for (let i = event.messages.length - 1; i >= 0; i--) {
-				if ((event.messages[i] as any).customType === "todo-sidebar-context") {
+			for (let i = scopedMessages.length - 1; i >= 0; i--) {
+				if ((scopedMessages[i] as any).customType === "todo-sidebar-context") {
 					lastTodoContextIndex = i;
 					break;
 				}
 			}
 		}
 		return {
-			messages: event.messages.filter((message, index) => {
+			messages: scopedMessages.filter((message, index) => {
 				const customType = (message as any).customType;
-				if (customType === "plan-mode-context") return false;
+				if (shouldDropPlanUiMessage(customType)) return false;
 				if (customType === "todo-sidebar-context") return keepTodoContext && index === lastTodoContextIndex;
 				return true;
 			}),
@@ -1595,7 +1918,9 @@ Allowed main-agent actions:
 
 Use plan_agent when the user wants a written plan. plan-agent receives the user's prompt, the parent system prompt, repository AGENTS/CLAUDE context, web search via plan_web_search, code searching/checking tools, and write/edit/delete permission only under .plan/. It must write both the markdown plan and .plan/todo.jsonl todos.
 
-If you call plan_agent, pass the user's request as the prompt. Do not use edit/write directly in plan mode.`,
+After plan_agent succeeds, the parent plan-mode extension will show the plan content, ask the user to choose execute / shelve / revise, and only exit plan mode after user approval. On approved exit, future LLM context is pruned to a handoff containing the user's original prompt and the plan.
+
+If you call plan_agent, pass the user's request as the prompt. Do not use edit/write directly in plan mode. If the user requests revision, call plan_agent again with the same outputPath; do not implement until plan mode exits.`,
 					display: false,
 				},
 			};

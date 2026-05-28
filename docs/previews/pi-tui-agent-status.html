@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+  <meta charset="utf-8">
+  <title>pi-TUI · agent status variations</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    html, body { margin: 0; padding: 0; }
+    body {
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #1a1916;
+      color: #ECE7DC;
+      min-height: 100vh;
+      padding: 56px 40px 80px;
+      -webkit-font-smoothing: antialiased;
+    }
+    .page-h, .theme-switch, .grid { max-width: 980px; margin-left: auto; margin-right: auto; }
+    .page-h { margin-bottom: 30px; }
+    h1 { margin: 0 0 8px; font-size: 40px; letter-spacing: -0.02em; }
+    .sub { color: #9A9385; font-size: 15px; max-width: 66ch; line-height: 1.6; }
+    .theme-switch { margin-bottom: 28px; display: flex; gap: 8px; align-items: center; color: #9A9385; font-size: 13px; }
+    .theme-switch button {
+      font: inherit; color: #B0A99A; background: transparent; border: 1px solid rgba(236,231,220,0.18);
+      border-radius: 6px; padding: 5px 12px; cursor: pointer;
+    }
+    .theme-switch button:hover { background: rgba(236,231,220,0.06); color: #ECE7DC; }
+    .theme-switch button[aria-pressed="true"] { background: rgba(216,155,126,0.15); color: #D89B7E; border-color: rgba(216,155,126,0.42); }
+    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px; }
+    @media (max-width: 760px) { .grid { grid-template-columns: 1fr; } body { padding: 34px 18px 56px; } }
+    .card { display: flex; flex-direction: column; gap: 10px; }
+    .label { display: flex; gap: 10px; color: #777768; font-size: 13px; align-items: baseline; }
+    .label .n { color: #D89B7E; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .label .name { color: #ECE7DC; font-weight: 600; }
+    .tui-screen {
+      --bg: #EFE7D4; --ink: #1D1916; --ink-2: #5B524A; --ink-3: #8C8175; --rule: rgba(29,25,22,0.16);
+      --yellow: #8A6A1F; --green: #3F5C45; --blue: #2F5A78; --accent: #8C2A1F;
+      background: var(--bg); color: var(--ink); border: 1px solid var(--rule); border-radius: 10px;
+      padding: 22px 24px; box-shadow: 0 1px 0 rgba(0,0,0,0.35), 0 14px 30px rgba(0,0,0,0.28);
+      font: 14px/1.65 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      white-space: pre; overflow: hidden;
+    }
+    body[data-theme="dark"] .tui-screen { --bg: #2E322E; --ink: #ECE7DC; --ink-2: #B0B0A5; --ink-3: #777768; --rule: rgba(236,231,220,0.14); --yellow: #D9B670; --green: #ADC79A; --blue: #8FB4CE; --accent: #D89B7E; }
+    body[data-theme="light"] .tui-screen { --bg: #F5F1EA; --ink: #2A2D28; --ink-2: #6B6B60; --ink-3: #9A9A8E; --rule: rgba(42,45,40,0.14); --yellow: #A88A50; --green: #6F8A68; --blue: #5F8880; --accent: #A8734F; }
+    .line { display: block; }
+    .yellow { color: var(--yellow); font-weight: 800; }
+    .green { color: var(--green); font-weight: 800; }
+    .blue { color: var(--blue); }
+    .accent { color: var(--accent); }
+    .dim { color: var(--ink-2); }
+    .faint { color: var(--ink-3); }
+    .rule { color: var(--rule); }
+  </style>
+</head>
+<body data-theme="dark">
+  <header class="page-h">
+    <h1>Agent status variations</h1>
+    <p class="sub">gr0k-hack replaces the default streaming loader with a compact three-line Grok-style status: phase, latest visible assistant text, and the current/read/changed file. Edit and write renderers show file names only—no diffs or file contents.</p>
+  </header>
+  <div class="theme-switch" role="group" aria-label="Theme">
+    <span>Theme</span>
+    <button type="button" data-theme="paper">paper</button>
+    <button type="button" data-theme="light">light</button>
+    <button type="button" data-theme="dark" aria-pressed="true">dark</button>
+  </div>
+  <main class="grid">
+    <section class="card">
+      <div class="label"><span class="n">1</span><span class="name">Grok web rail</span><span>/switch-agentStatus 1</span></div>
+      <div class="tui-screen"><span class="line"><span class="yellow">● THINKING</span></span><span class="line">  <span class="dim">refactoring picker → context provider…</span></span><span class="line">  <span class="blue">↳ extensions/choice-picker.ts</span></span></div>
+    </section>
+    <section class="card">
+      <div class="label"><span class="n">2</span><span class="name">Thin terminal frame</span><span>/switch-agentStatus 2</span></div>
+      <div class="tui-screen"><span class="line"><span class="faint">╭─</span> <span class="blue" style="font-weight:800">READING</span></span><span class="line"><span class="faint">│ </span><span class="dim">opening preview sources…</span></span><span class="line"><span class="faint">╰─↳ </span><span class="blue">README.md</span></span></div>
+    </section>
+    <section class="card">
+      <div class="label"><span class="n">3</span><span class="name">Soft status chips</span><span>/switch-agentStatus 3</span></div>
+      <div class="tui-screen"><span class="line"><span class="faint">[</span> <span class="green">EXECUTING</span> <span class="faint">]</span></span><span class="line"><span class="accent">›</span> <span class="dim">applying compact tool renderer…</span></span><span class="line"><span class="blue">↳ extensions/gr0k-hack/index.ts</span></span></div>
+    </section>
+    <section class="card">
+      <div class="label"><span class="n">4</span><span class="name">Blueprint pulse</span><span>/switch-agentStatus 4</span></div>
+      <div class="tui-screen"><span class="line"><span class="blue">▌</span> <span class="yellow">THINKING</span></span><span class="line"><span class="blue">▌</span> checking README previews…</span><span class="line"><span class="blue">▌ ↳ docs/previews/agent-status.svg</span></span></div>
+    </section>
+  </main>
+  <script>
+    const buttons = Array.from(document.querySelectorAll('[data-theme]'));
+    function setTheme(theme) {
+      document.body.dataset.theme = theme;
+      buttons.forEach((button) => button.setAttribute('aria-pressed', button.dataset.theme === theme ? 'true' : 'false'));
+    }
+    buttons.forEach((button) => button.addEventListener('click', () => setTheme(button.dataset.theme)));
+  </script>
+</body></html>

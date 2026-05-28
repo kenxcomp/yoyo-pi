@@ -1,0 +1,33 @@
+<svg width="760" height="360" viewBox="0 0 760 360" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">gr0k-hack agent status variations</title>
+  <desc id="desc">Four compact Grok-style three-line agent status variants for pi.</desc>
+  <rect width="760" height="360" rx="18" fill="#1A1916"/>
+  <rect x="34" y="30" width="692" height="300" rx="14" fill="#2E322E" stroke="rgba(236,231,220,0.12)"/>
+  <g font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="14">
+    <text x="62" y="64" fill="#777768">/switch-agentStatus 1-4</text>
+    <g transform="translate(62 92)">
+      <rect width="300" height="86" rx="10" fill="rgba(26,25,22,0.35)" stroke="rgba(236,231,220,0.08)"/>
+      <text x="20" y="26" fill="#D9B670" font-weight="700">● THINKING</text>
+      <text x="20" y="50" fill="#B0B0A5">refactoring picker → context provider…</text>
+      <text x="20" y="73" fill="#8FB4CE">↳ extensions/choice-picker.ts</text>
+    </g>
+    <g transform="translate(398 92)">
+      <rect width="300" height="86" rx="10" fill="rgba(26,25,22,0.35)" stroke="rgba(236,231,220,0.08)"/>
+      <text x="20" y="26" fill="#777768">╭─ <tspan fill="#8FB4CE" font-weight="700">READING</tspan></text>
+      <text x="20" y="50" fill="#B0B0A5">│ opening preview sources…</text>
+      <text x="20" y="73" fill="#8FB4CE">╰─↳ README.md</text>
+    </g>
+    <g transform="translate(62 206)">
+      <rect width="300" height="86" rx="10" fill="rgba(26,25,22,0.35)" stroke="rgba(236,231,220,0.08)"/>
+      <text x="20" y="26" fill="#777768">[ <tspan fill="#ADC79A" font-weight="700">EXECUTING</tspan> ]</text>
+      <text x="20" y="50" fill="#D89B7E">› <tspan fill="#B0B0A5">applying compact tool renderer…</tspan></text>
+      <text x="20" y="73" fill="#8FB4CE">↳ extensions/gr0k-hack/index.ts</text>
+    </g>
+    <g transform="translate(398 206)">
+      <rect width="300" height="86" rx="10" fill="rgba(26,25,22,0.35)" stroke="rgba(236,231,220,0.08)"/>
+      <text x="20" y="26" fill="#8FB4CE">▌ <tspan fill="#D9B670" font-weight="700">THINKING</tspan></text>
+      <text x="20" y="50" fill="#8FB4CE">▌ <tspan fill="#ECE7DC">checking README previews…</tspan></text>
+      <text x="20" y="73" fill="#8FB4CE">▌ ↳ docs/previews/agent-status.svg</text>
+    </g>
+  </g>
+</svg>

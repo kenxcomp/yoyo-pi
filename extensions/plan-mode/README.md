@@ -8,7 +8,7 @@ Packaged extension in `extensions/plan-mode/`.
 - `/plan <request>` - enter plan mode and spawn `plan-agent` for the request.
 - `/plan spawn <request>` - same as above.
 - `/plan status` - show whether plan mode is active.
-- `/plan off` - leave plan mode, restore previous active tools, and open the todo sidebar for the latest `.plan/*.jsonl` todo file.
+- `/plan off` - leave plan mode, first showing the latest generated plan when available, then restoring previous active tools and opening the todo sidebar for the latest `.plan/*.jsonl` todo file.
 - `/todo` - toggle the right-side todo timeline sidebar.
 - `/todo show` - open the latest `.plan/*.jsonl` todo sidebar.
 - `/todo off` - close the todo sidebar.
@@ -33,6 +33,16 @@ The child agent can:
 Plans are written to `.plan/<timestamp>-<slug>.md` unless an output path under `.plan/` is provided.
 
 Each `plan-agent` run must also rewrite `.plan/todo.jsonl` with one JSON object per implementation todo derived from the plan's numbered steps. The todo lines use `type: "plan_todo"`, `schemaVersion: 1`, `planPath`, `step`, `title`, `description`, `status: "pending"`, `priority`, `dependencies`, `validation`, and `createdAt` fields.
+
+## Plan review and exit handoff
+
+After a successful `plan-agent` run, the parent `plan-mode` extension displays the markdown plan content before asking whether to exit plan mode. The review choices are:
+
+- `plan没问题，允许退出plan mode，开始执行` — exit plan mode, open the todo sidebar, and send a kickoff message to execute the approved plan while updating `.plan/todo.jsonl` statuses.
+- `允许退出plan mode，先搁置` — exit plan mode and open the todo sidebar without starting execution.
+- `不允许退出，需要修改：{修改意见}` — stay in plan mode, collect modification feedback, and ask the main agent to rerun `plan_agent` with the same output path.
+
+When plan mode really exits with an approved/shelved plan, future LLM context is pruned to a hidden handoff containing only the user's original planning prompt, the plan path/content, the todo path, and newer messages. The old planning conversation and `plan_agent` tool history remain in the session file but are not sent as active LLM context.
 
 ## Todo sidebar
 
