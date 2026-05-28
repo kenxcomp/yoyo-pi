@@ -13,78 +13,367 @@
       padding: 56px 40px 80px;
       -webkit-font-smoothing: antialiased;
     }
-    .page-h, .theme-switch, .grid { max-width: 980px; margin-left: auto; margin-right: auto; }
-    .page-h { margin-bottom: 30px; }
+    .page-h, .theme-switch, .grid, .jump { max-width: 980px; margin-left: auto; margin-right: auto; }
+    .page-h { margin-bottom: 22px; }
     h1 { margin: 0 0 8px; font-size: 40px; letter-spacing: -0.02em; }
-    .sub { color: #9A9385; font-size: 15px; max-width: 66ch; line-height: 1.6; }
-    .theme-switch { margin-bottom: 28px; display: flex; gap: 8px; align-items: center; color: #9A9385; font-size: 13px; }
-    .theme-switch button {
-      font: inherit; color: #B0A99A; background: transparent; border: 1px solid rgba(236,231,220,0.18);
-      border-radius: 6px; padding: 5px 12px; cursor: pointer;
+    .sub { color: #9A9385; font-size: 15px; max-width: 74ch; line-height: 1.6; }
+    .jump { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+    .jump a, .theme-switch button {
+      font: inherit;
+      color: #B0A99A;
+      background: transparent;
+      border: 1px solid rgba(236,231,220,0.18);
+      border-radius: 999px;
+      padding: 5px 12px;
+      text-decoration: none;
+      cursor: pointer;
     }
-    .theme-switch button:hover { background: rgba(236,231,220,0.06); color: #ECE7DC; }
+    .jump a:hover, .theme-switch button:hover { background: rgba(236,231,220,0.06); color: #ECE7DC; }
+    .theme-switch { margin-bottom: 28px; display: flex; gap: 8px; align-items: center; color: #9A9385; font-size: 13px; }
     .theme-switch button[aria-pressed="true"] { background: rgba(216,155,126,0.15); color: #D89B7E; border-color: rgba(216,155,126,0.42); }
     .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px; }
     @media (max-width: 760px) { .grid { grid-template-columns: 1fr; } body { padding: 34px 18px 56px; } }
-    .card { display: flex; flex-direction: column; gap: 10px; }
-    .label { display: flex; gap: 10px; color: #777768; font-size: 13px; align-items: baseline; }
+    .card { display: flex; flex-direction: column; gap: 10px; scroll-margin-top: 28px; }
+    .card:target .tui-screen { border-color: rgba(216,155,126,0.62); box-shadow: 0 0 0 2px rgba(216,155,126,0.22), 0 14px 30px rgba(0,0,0,0.28); }
+    .label { display: flex; flex-wrap: wrap; gap: 10px; color: #777768; font-size: 13px; align-items: baseline; }
     .label .n { color: #D89B7E; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
     .label .name { color: #ECE7DC; font-weight: 600; }
+    .label a { color: #8FB4CE; text-decoration: none; }
+    .label a:hover { text-decoration: underline; }
+
     .tui-screen {
-      --bg: #EFE7D4; --ink: #1D1916; --ink-2: #5B524A; --ink-3: #8C8175; --rule: rgba(29,25,22,0.16);
-      --yellow: #8A6A1F; --green: #3F5C45; --blue: #2F5A78; --accent: #8C2A1F;
-      background: var(--bg); color: var(--ink); border: 1px solid var(--rule); border-radius: 10px;
-      padding: 22px 24px; box-shadow: 0 1px 0 rgba(0,0,0,0.35), 0 14px 30px rgba(0,0,0,0.28);
-      font: 14px/1.65 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-      white-space: pre; overflow: hidden;
+      --tui-bg: #EFE7D4;
+      --tui-bg-edge: #E5DBC2;
+      --tui-ink: #1D1916;
+      --tui-ink-2: #5B524A;
+      --tui-ink-3: #8C8175;
+      --tui-rule: rgba(29,25,22,0.18);
+      --tui-red: #8C2A1F;
+      --tui-red-bg: rgba(140,42,31,0.10);
+      --tui-yellow: #8A6A1F;
+      --tui-yellow-bg: rgba(138,106,31,0.12);
+      --tui-green: #3F5C45;
+      --tui-green-bg: rgba(63,92,69,0.12);
+      --tui-blue: #2F5A78;
+      --tui-blue-bg: rgba(47,90,120,0.10);
+      --tui-purple: #6E4A78;
+      --tui-paper-tex: 0.6;
+
+      position: relative;
+      overflow: hidden;
+      background: var(--tui-bg);
+      color: var(--tui-ink);
+      border: 1px solid var(--tui-rule);
+      border-radius: 10px;
+      padding: 22px 24px;
+      box-shadow: 0 1px 0 rgba(0,0,0,0.35), 0 14px 30px rgba(0,0,0,0.28);
+      font: 13px/1.65 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      white-space: pre;
     }
-    body[data-theme="dark"] .tui-screen { --bg: #2E322E; --ink: #ECE7DC; --ink-2: #B0B0A5; --ink-3: #777768; --rule: rgba(236,231,220,0.14); --yellow: #D9B670; --green: #ADC79A; --blue: #8FB4CE; --accent: #D89B7E; }
-    body[data-theme="light"] .tui-screen { --bg: #F5F1EA; --ink: #2A2D28; --ink-2: #6B6B60; --ink-3: #9A9A8E; --rule: rgba(42,45,40,0.14); --yellow: #A88A50; --green: #6F8A68; --blue: #5F8880; --accent: #A8734F; }
-    .line { display: block; }
-    .yellow { color: var(--yellow); font-weight: 800; }
-    .green { color: var(--green); font-weight: 800; }
-    .blue { color: var(--blue); }
-    .accent { color: var(--accent); }
-    .dim { color: var(--ink-2); }
-    .faint { color: var(--ink-3); }
-    .rule { color: var(--rule); }
+    .tui-screen::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(circle at 11% 17%, rgba(0,0,0,0.025) 0.5px, transparent 1px),
+        radial-gradient(circle at 71% 39%, rgba(255,255,255,0.06) 0.5px, transparent 1px),
+        radial-gradient(circle at 33% 67%, rgba(0,0,0,0.02) 0.5px, transparent 1px);
+      background-size: 7px 7px, 13px 13px, 19px 19px;
+      opacity: var(--tui-paper-tex);
+    }
+    .tui-screen > * { position: relative; z-index: 1; }
+    body[data-theme="dark"] .tui-screen {
+      --tui-bg: #2E322E;
+      --tui-bg-edge: #272A27;
+      --tui-ink: #ECE7DC;
+      --tui-ink-2: #B0B0A5;
+      --tui-ink-3: #777768;
+      --tui-rule: rgba(236,231,220,0.18);
+      --tui-red: #D89B7E;
+      --tui-red-bg: rgba(216,155,126,0.14);
+      --tui-yellow: #D9B670;
+      --tui-yellow-bg: rgba(217,182,112,0.16);
+      --tui-green: #ADC79A;
+      --tui-green-bg: rgba(173,199,154,0.14);
+      --tui-blue: #8FB4CE;
+      --tui-blue-bg: rgba(143,180,206,0.12);
+      --tui-purple: #BCA0C5;
+      --tui-paper-tex: 0;
+    }
+    body[data-theme="dark"] .tui-screen::before { display: none; }
+    body[data-theme="light"] .tui-screen {
+      --tui-bg: #F5F1EA;
+      --tui-bg-edge: #ECE7DC;
+      --tui-ink: #2A2D28;
+      --tui-ink-2: #6B6B60;
+      --tui-ink-3: #9A9A8E;
+      --tui-rule: rgba(42,45,40,0.14);
+      --tui-red: #A8734F;
+      --tui-yellow: #A88A50;
+      --tui-green: #6F8A68;
+      --tui-blue: #5F8880;
+      --tui-purple: #8A6E9C;
+      --tui-paper-tex: 0;
+    }
+    body[data-theme="light"] .tui-screen::before { display: none; }
+
+    .tui-line { display: block; white-space: pre; font-feature-settings: 'liga' 0, 'calt' 0; }
+    .tui-red { color: var(--tui-red); }
+    .tui-yel { color: var(--tui-yellow); }
+    .tui-grn { color: var(--tui-green); }
+    .tui-blu { color: var(--tui-blue); }
+    .tui-pur { color: var(--tui-purple); }
+    .tui-dim { color: var(--tui-ink-2); }
+    .tui-faint { color: var(--tui-ink-3); }
+    .tui-bold { font-weight: 700; }
+    .tui-italic { font-style: italic; }
+    .tui-fill-red { background: var(--tui-red-bg); color: var(--tui-red); }
+    .tui-fill-yel { background: var(--tui-yellow-bg); color: var(--tui-yellow); }
+    .tui-fill-grn { background: var(--tui-green-bg); color: var(--tui-green); }
+    .tui-fill-blu { background: var(--tui-blue-bg); color: var(--tui-blue); }
+    .tui-fill-dim { background: rgba(0,0,0,0.05); }
+    .tui-spin { display: inline-block; width: 1ch; text-align: center; }
+    .tui-spin::before { content: attr(data-frame); }
+    .tui-dots { display: inline-block; min-width: 3ch; white-space: pre; }
   </style>
 </head>
 <body data-theme="dark">
   <header class="page-h">
     <h1>Agent status variations</h1>
-    <p class="sub">gr0k-hack replaces the default streaming loader with a compact three-line Grok-style status: phase, latest visible assistant text, and the current/read/changed file. Edit and write renderers show file names only—no diffs or file contents.</p>
+    <p class="sub">gr0k-hack replaces pi's default streaming loader with selectable terminal-native status readouts. These previews mirror <code>/switch-agentStatus 1</code> through <code>9</code>: phase, latest visible assistant text, and the current/read/changed file. Edit and write renderers show file names only—no diffs or file contents.</p>
   </header>
+
+  <nav class="jump" aria-label="Jump to variant">
+    <a href="#v1">V1 hairline</a>
+    <a href="#v2">V2 phase</a>
+    <a href="#v3">V3 rail</a>
+    <a href="#v4">V4 card</a>
+    <a href="#v5">V5 margin</a>
+    <a href="#v6">V6 sigil</a>
+    <a href="#v7">V7 split</a>
+    <a href="#v8">V8 micro</a>
+    <a href="#v9">V9 stamp</a>
+  </nav>
+
   <div class="theme-switch" role="group" aria-label="Theme">
     <span>Theme</span>
-    <button type="button" data-theme="paper">paper</button>
-    <button type="button" data-theme="light">light</button>
-    <button type="button" data-theme="dark" aria-pressed="true">dark</button>
+    <button type="button" data-theme-btn="paper">paper</button>
+    <button type="button" data-theme-btn="light">light</button>
+    <button type="button" data-theme-btn="dark" aria-pressed="true">dark</button>
   </div>
-  <main class="grid">
-    <section class="card">
-      <div class="label"><span class="n">1</span><span class="name">Grok web rail</span><span>/switch-agentStatus 1</span></div>
-      <div class="tui-screen"><span class="line"><span class="yellow">● THINKING</span></span><span class="line">  <span class="dim">refactoring picker → context provider…</span></span><span class="line">  <span class="blue">↳ extensions/choice-picker.ts</span></span></div>
-    </section>
-    <section class="card">
-      <div class="label"><span class="n">2</span><span class="name">Thin terminal frame</span><span>/switch-agentStatus 2</span></div>
-      <div class="tui-screen"><span class="line"><span class="faint">╭─</span> <span class="blue" style="font-weight:800">READING</span></span><span class="line"><span class="faint">│ </span><span class="dim">opening preview sources…</span></span><span class="line"><span class="faint">╰─↳ </span><span class="blue">README.md</span></span></div>
-    </section>
-    <section class="card">
-      <div class="label"><span class="n">3</span><span class="name">Soft status chips</span><span>/switch-agentStatus 3</span></div>
-      <div class="tui-screen"><span class="line"><span class="faint">[</span> <span class="green">EXECUTING</span> <span class="faint">]</span></span><span class="line"><span class="accent">›</span> <span class="dim">applying compact tool renderer…</span></span><span class="line"><span class="blue">↳ extensions/gr0k-hack/index.ts</span></span></div>
-    </section>
-    <section class="card">
-      <div class="label"><span class="n">4</span><span class="name">Blueprint pulse</span><span>/switch-agentStatus 4</span></div>
-      <div class="tui-screen"><span class="line"><span class="blue">▌</span> <span class="yellow">THINKING</span></span><span class="line"><span class="blue">▌</span> checking README previews…</span><span class="line"><span class="blue">▌ ↳ docs/previews/agent-status.svg</span></span></div>
-    </section>
-  </main>
+
+  <main id="grid" class="grid"></main>
+
   <script>
-    const buttons = Array.from(document.querySelectorAll('[data-theme]'));
-    function setTheme(theme) {
-      document.body.dataset.theme = theme;
-      buttons.forEach((button) => button.setAttribute('aria-pressed', button.dataset.theme === theme ? 'true' : 'false'));
+  function tuiRender(line) {
+    const out = [];
+    const stack = [];
+    let buf = '';
+    let i = 0;
+    const flush = () => {
+      if (!buf) return;
+      const text = escapeHtml(buf);
+      if (stack.length) {
+        const cls = stack.map(mapClass).join(' ');
+        out.push(`<span class="${cls}">${text}</span>`);
+      } else {
+        out.push(text);
+      }
+      buf = '';
+    };
+    while (i < line.length) {
+      if (line[i] === '«' && line.charAt(i + 1) === '/' && line.charAt(i + 2) === '»') {
+        flush();
+        stack.pop();
+        i += 3;
+      } else if (line[i] === '«') {
+        const close = line.indexOf('»', i + 1);
+        if (close === -1) { buf += line[i]; i++; continue; }
+        flush();
+        const tok = line.slice(i + 1, close);
+        if (tok === 'spin') {
+          out.push('<span class="tui-spin" data-frame="⠋"></span>');
+        } else if (tok === 'dots') {
+          out.push('<span class="tui-dots"></span>');
+        } else {
+          stack.push(tok);
+        }
+        i = close + 1;
+      } else {
+        buf += line[i];
+        i++;
+      }
     }
-    buttons.forEach((button) => button.addEventListener('click', () => setTheme(button.dataset.theme)));
+    flush();
+    return out.join('');
+  }
+  function escapeHtml(s) {
+    return s.replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+  }
+  function mapClass(k) {
+    return ({
+      red:'tui-red', yel:'tui-yel', grn:'tui-grn', blu:'tui-blu', pur:'tui-pur',
+      dim:'tui-dim', faint:'tui-faint', b:'tui-bold', it:'tui-italic',
+      fred:'tui-fill-red', fyel:'tui-fill-yel', fgrn:'tui-fill-grn',
+      fblu:'tui-fill-blu', fdim:'tui-fill-dim',
+    }[k] || k);
+  }
+  function tuiLen(line) {
+    return line.replace(/«spin»|«dots»|«pulse»/g, ' ').replace(/«[^»]*»/g, '').length;
+  }
+  function tuiPad(line, width, fill = ' ') {
+    const n = tuiLen(line);
+    if (n >= width) return line;
+    return line + fill.repeat(width - n);
+  }
+  function trunc(s, w) {
+    if (s.length <= w) return s;
+    return '…' + s.slice(s.length - w + 1);
+  }
+
+  const S = {
+    thinking: { label: 'thinking', tone: 'yel', tonefill: 'fyel', glyph: '✱', thought: 'planning the refactor — extract picker state into a provider', file: '~/sage-app/src/components/FilePicker.tsx' },
+    executing: { label: 'executing', tone: 'red', tonefill: 'fred', glyph: '▶', thought: 'applying edit · move usePickerState → PickerContext', file: '~/sage-app/src/components/PickerContext.tsx' },
+    reading: { label: 'reading', tone: 'blu', tonefill: 'fblu', glyph: '◐', thought: 'scanning callers of usePickerState (4 files)', file: '~/sage-app/src/hooks/usePickerState.ts' },
+    writing: { label: 'writing', tone: 'grn', tonefill: 'fgrn', glyph: '✎', thought: 'committing the new provider boundary', file: '~/sage-app/src/components/FilePicker.tsx' },
+  };
+
+  function v1_hairline(scn) {
+    const W = 86, L = [];
+    const badge = `«${scn.tonefill}» ${scn.label.toUpperCase()} «/»`;
+    L.push(' ' + badge + '   «spin» «' + scn.tone + '»' + scn.glyph + '«/»  «faint»14:23:09«/»');
+    L.push(' «dim»' + tuiPad(scn.thought + '«dots»', W - 2) + '«/»');
+    L.push(' «faint»↳«/»  «' + scn.tone + '»' + trunc(scn.file, W - 6) + '«/»');
+    return L;
+  }
+  function v2_step(scn) {
+    const W = 86;
+    return [
+      ' «faint»[agent] «/»«' + scn.tone + '»' + scn.label.toUpperCase() + '«/»«dots»',
+      ' «dim»❝ ' + scn.thought + ' ❞«/»',
+      ' «faint»file «/»«' + scn.tone + '»' + trunc(scn.file, W - 8) + '«/»',
+    ];
+  }
+  function v3_rail(scn) {
+    const W = 86;
+    return [
+      '«' + scn.tone + '»▌«/» «b»' + scn.label.toUpperCase() + '«/»  «spin» «faint»agent · turn 7«/»',
+      '«' + scn.tone + '»▌«/» «dim»' + scn.thought + '«/»«dots»',
+      '«' + scn.tone + '»▌«/» «faint»↳«/» «' + scn.tone + '»' + trunc(scn.file, W - 6) + '«/»',
+    ];
+  }
+  function v4_card(scn) {
+    const W = 86, inner = W - 2;
+    const head = ' «spin»  «b»' + scn.label.toUpperCase() + '«/»«dots»' + '  «faint»·  agent · turn 7«/»';
+    const mid  = ' «dim»' + scn.thought + '«/»';
+    const foot = ' «faint»↳«/» «' + scn.tone + '»' + trunc(scn.file, inner - 4) + '«/»';
+    return [
+      '╭' + '─'.repeat(W - 2) + '╮',
+      '│' + tuiPad(head, inner) + '│',
+      '├' + '┄'.repeat(W - 2) + '┤',
+      '│' + tuiPad(mid,  inner) + '│',
+      '│' + tuiPad(foot, inner) + '│',
+      '╰' + '─'.repeat(W - 2) + '╯',
+    ];
+  }
+  function v5_margin(scn) {
+    const W = 86, G = 12;
+    const m = s => tuiPad(s, G);
+    return [
+      m('«faint»state«/»') + '«' + scn.tonefill + '» ' + scn.label.toUpperCase() + ' «/»' + '   «spin»  «faint»turn 7«/»',
+      m('«faint»thought«/»') + '«dim»' + scn.thought + '«/»«dots»',
+      m('«faint»file«/»') + '«' + scn.tone + '»' + trunc(scn.file, W - G) + '«/»',
+    ];
+  }
+  function v6_sigil(scn) {
+    const W = 86;
+    return [
+      '«faint»::«/» «' + scn.tone + '»' + scn.label + '«/»«dots»' + '   «faint»turn 7 · 1.4s«/»',
+      '«faint» ›«/» «dim»' + scn.thought + '«/»',
+      '«faint» ⌁«/» «' + scn.tone + '»' + trunc(scn.file, W - 6) + '«/»',
+    ];
+  }
+  function v7_split(scn) {
+    const W = 86;
+    const topTab = `╴ «${scn.tonefill}» ${scn.label.toUpperCase()} «/» «faint»turn 7«/» ╴`;
+    const topPad = W - tuiLen(topTab);
+    const file = trunc(scn.file, W - 14);
+    const botTab = `«faint»╴«/» «faint»file«/» «${scn.tone}»${file}«/» «faint»╴«/»`;
+    const botPad = W - tuiLen(botTab);
+    return [
+      topTab + '«faint»' + '─'.repeat(Math.max(2, topPad)) + '«/»',
+      '',
+      ' «spin»  «dim»' + scn.thought + '«/»«dots»',
+      '',
+      botTab + '«faint»' + '─'.repeat(Math.max(2, botPad)) + '«/»',
+    ];
+  }
+  function v8_micro(scn) {
+    const W = 64;
+    return [
+      '«' + scn.tone + '»●«/» «b»' + scn.label + '«/»' + '«dots»',
+      '«faint»│«/»  «dim»' + scn.thought + '«/»',
+      '«faint»╰─«/»«faint»file «/»«' + scn.tone + '»' + trunc(scn.file, W - 12) + '«/»',
+    ];
+  }
+  function v9_stamp(scn) {
+    const W = 86;
+    return [
+      '«' + scn.tonefill + '» ' + scn.label.toUpperCase().padEnd(9, ' ') + '«/» «spin»  «dim»' + scn.thought + '«/»«dots»',
+      ' '.repeat(11) + '«faint»' + '─'.repeat(W - 12) + '«/»',
+      ' '.repeat(11) + '«faint»↳ file«/»  «' + scn.tone + '»' + trunc(scn.file, W - 22) + '«/»',
+    ];
+  }
+
+  const VARIANTS = [
+    { n: 'V1', id: 'v1', name: 'hairline readout', note: 'three indented lines, ochre badge, dim thought', state: 'thinking', build: v1_hairline },
+    { n: 'V2', id: 'v2', name: 'phase tag', note: '[agent] header · quoted thought · file label', state: 'executing', build: v2_step },
+    { n: 'V3', id: 'v3', name: 'left-rail accent', note: 'colored bar runs vertically through all three rows', state: 'reading', build: v3_rail },
+    { n: 'V4', id: 'v4', name: 'soft card', note: 'rounded box · status row, divider, thought + file', state: 'writing', build: v4_card },
+    { n: 'V5', id: 'v5', name: 'margin labels', note: 'editorial state / thought / file gutter', state: 'thinking', build: v5_margin },
+    { n: 'V6', id: 'v6', name: 'sigil prefix', note: 'each line begins with a different terminal sigil', state: 'executing', build: v6_sigil },
+    { n: 'V7', id: 'v7', name: 'split-bar', note: 'status tabs into top rule, file into bottom', state: 'reading', build: v7_split },
+    { n: 'V8', id: 'v8', name: 'micro-log', note: 'compact 3-row entry for narrow rails', state: 'thinking', build: v8_micro },
+    { n: 'V9', id: 'v9', name: 'stamp head', note: 'tinted stamp block at the head of the row', state: 'executing', build: v9_stamp },
+  ];
+
+  const grid = document.getElementById('grid');
+  for (const v of VARIANTS) {
+    const scn = S[v.state];
+    const card = document.createElement('section');
+    card.id = v.id;
+    card.className = 'card';
+    card.innerHTML = `
+      <div class="label">
+        <span class="n">${v.n}</span>
+        <span class="name">${v.name}</span>
+        <span>${v.note}</span>
+        <a href="#${v.id}">/switch-agentStatus ${v.n.slice(1)}</a>
+      </div>
+      <div class="tui-screen">${v.build(scn).map(l => `<span class="tui-line">${tuiRender(l) || '&nbsp;'}</span>`).join('')}</div>
+    `;
+    grid.appendChild(card);
+  }
+
+  const FRAMES = ['⠋','⠙','⠹','⠸','⠼','⠴','⠦','⠧','⠇','⠏'];
+  const DOTS = ['   ', '.  ', '.. ', '...'];
+  let f = 0;
+  setInterval(() => {
+    f = (f + 1) % FRAMES.length;
+    document.querySelectorAll('.tui-spin').forEach(el => el.setAttribute('data-frame', FRAMES[f]));
+    document.querySelectorAll('.tui-dots').forEach(el => el.style.setProperty('--dots', JSON.stringify(DOTS[Math.floor(f / 2) % DOTS.length])));
+    document.querySelectorAll('.tui-dots').forEach(el => el.textContent = DOTS[Math.floor(f / 2) % DOTS.length]);
+  }, 90);
+
+  document.querySelectorAll('[data-theme-btn]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const theme = btn.dataset.themeBtn;
+      document.body.dataset.theme = theme;
+      document.querySelectorAll('[data-theme-btn]').forEach(b => {
+        b.setAttribute('aria-pressed', b === btn ? 'true' : 'false');
+      });
+    });
+  });
   </script>
 </body></html>

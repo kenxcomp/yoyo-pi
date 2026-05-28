@@ -1,33 +1,83 @@
-<svg width="760" height="360" viewBox="0 0 760 360" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+<svg width="760" height="560" viewBox="0 0 760 560" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
   <title id="title">gr0k-hack agent status variations</title>
-  <desc id="desc">Four compact Grok-style three-line agent status variants for pi.</desc>
-  <rect width="760" height="360" rx="18" fill="#1A1916"/>
-  <rect x="34" y="30" width="692" height="300" rx="14" fill="#2E322E" stroke="rgba(236,231,220,0.12)"/>
-  <g font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="14">
-    <text x="62" y="64" fill="#777768">/switch-agentStatus 1-4</text>
-    <g transform="translate(62 92)">
-      <rect width="300" height="86" rx="10" fill="rgba(26,25,22,0.35)" stroke="rgba(236,231,220,0.08)"/>
-      <text x="20" y="26" fill="#D9B670" font-weight="700">● THINKING</text>
-      <text x="20" y="50" fill="#B0B0A5">refactoring picker → context provider…</text>
-      <text x="20" y="73" fill="#8FB4CE">↳ extensions/choice-picker.ts</text>
+  <desc id="desc">Nine selectable terminal-native agent status variants for pi.</desc>
+  <rect width="760" height="560" rx="18" fill="#1A1916"/>
+  <rect x="30" y="28" width="700" height="504" rx="14" fill="#2E322E" stroke="rgba(236,231,220,0.12)"/>
+  <g font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="12">
+    <text x="56" y="60" fill="#777768">/switch-agentStatus 1-9 · V1-V9 mirror the HTML playground</text>
+
+    <g transform="translate(56 84)">
+      <rect width="200" height="118" rx="10" fill="rgba(26,25,22,0.35)" stroke="rgba(236,231,220,0.08)"/>
+      <text x="14" y="22" fill="#D89B7E">V1 hairline</text>
+      <text x="14" y="48" fill="#D9B670" font-weight="700"> THINKING ⠋ ✱</text>
+      <text x="14" y="70" fill="#B0B0A5"> planning the refactor...</text>
+      <text x="14" y="92" fill="#8FB4CE"> ↳ .../FilePicker.tsx</text>
     </g>
-    <g transform="translate(398 92)">
-      <rect width="300" height="86" rx="10" fill="rgba(26,25,22,0.35)" stroke="rgba(236,231,220,0.08)"/>
-      <text x="20" y="26" fill="#777768">╭─ <tspan fill="#8FB4CE" font-weight="700">READING</tspan></text>
-      <text x="20" y="50" fill="#B0B0A5">│ opening preview sources…</text>
-      <text x="20" y="73" fill="#8FB4CE">╰─↳ README.md</text>
+
+    <g transform="translate(280 84)">
+      <rect width="200" height="118" rx="10" fill="rgba(26,25,22,0.35)" stroke="rgba(236,231,220,0.08)"/>
+      <text x="14" y="22" fill="#D89B7E">V2 phase tag</text>
+      <text x="14" y="48" fill="#777768">[agent] <tspan fill="#D89B7E" font-weight="700">EXECUTING</tspan>...</text>
+      <text x="14" y="70" fill="#B0B0A5">❝ applying edit... ❞</text>
+      <text x="14" y="92" fill="#D89B7E">file .../PickerContext.tsx</text>
     </g>
-    <g transform="translate(62 206)">
-      <rect width="300" height="86" rx="10" fill="rgba(26,25,22,0.35)" stroke="rgba(236,231,220,0.08)"/>
-      <text x="20" y="26" fill="#777768">[ <tspan fill="#ADC79A" font-weight="700">EXECUTING</tspan> ]</text>
-      <text x="20" y="50" fill="#D89B7E">› <tspan fill="#B0B0A5">applying compact tool renderer…</tspan></text>
-      <text x="20" y="73" fill="#8FB4CE">↳ extensions/gr0k-hack/index.ts</text>
+
+    <g transform="translate(504 84)">
+      <rect width="200" height="118" rx="10" fill="rgba(26,25,22,0.35)" stroke="rgba(236,231,220,0.08)"/>
+      <text x="14" y="22" fill="#D89B7E">V3 left rail</text>
+      <text x="14" y="48" fill="#8FB4CE">▌ <tspan fill="#ECE7DC" font-weight="700">READING</tspan> ⠋</text>
+      <text x="14" y="70" fill="#8FB4CE">▌ <tspan fill="#B0B0A5">scanning callers...</tspan></text>
+      <text x="14" y="92" fill="#8FB4CE">▌ ↳ .../usePickerState.ts</text>
     </g>
-    <g transform="translate(398 206)">
-      <rect width="300" height="86" rx="10" fill="rgba(26,25,22,0.35)" stroke="rgba(236,231,220,0.08)"/>
-      <text x="20" y="26" fill="#8FB4CE">▌ <tspan fill="#D9B670" font-weight="700">THINKING</tspan></text>
-      <text x="20" y="50" fill="#8FB4CE">▌ <tspan fill="#ECE7DC">checking README previews…</tspan></text>
-      <text x="20" y="73" fill="#8FB4CE">▌ ↳ docs/previews/agent-status.svg</text>
+
+    <g transform="translate(56 222)">
+      <rect width="200" height="118" rx="10" fill="rgba(26,25,22,0.35)" stroke="rgba(236,231,220,0.08)"/>
+      <text x="14" y="22" fill="#D89B7E">V4 soft card</text>
+      <text x="14" y="45" fill="#777768">╭────────────────────╮</text>
+      <text x="14" y="63" fill="#ECE7DC">│ ⠋ <tspan font-weight="700">WRITING</tspan>...       │</text>
+      <text x="14" y="81" fill="#777768">├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┤</text>
+      <text x="14" y="99" fill="#ADC79A">│ ↳ .../FilePicker.tsx│</text>
+    </g>
+
+    <g transform="translate(280 222)">
+      <rect width="200" height="118" rx="10" fill="rgba(26,25,22,0.35)" stroke="rgba(236,231,220,0.08)"/>
+      <text x="14" y="22" fill="#D89B7E">V5 margin labels</text>
+      <text x="14" y="48" fill="#777768">state     <tspan fill="#D9B670" font-weight="700"> THINKING </tspan> ⠋</text>
+      <text x="14" y="70" fill="#777768">thought   <tspan fill="#B0B0A5">planning...</tspan></text>
+      <text x="14" y="92" fill="#777768">file      <tspan fill="#D9B670">.../FilePicker.tsx</tspan></text>
+    </g>
+
+    <g transform="translate(504 222)">
+      <rect width="200" height="118" rx="10" fill="rgba(26,25,22,0.35)" stroke="rgba(236,231,220,0.08)"/>
+      <text x="14" y="22" fill="#D89B7E">V6 sigil prefix</text>
+      <text x="14" y="48" fill="#777768">:: <tspan fill="#D89B7E">executing</tspan>... turn 7</text>
+      <text x="14" y="70" fill="#777768"> › <tspan fill="#B0B0A5">applying edit...</tspan></text>
+      <text x="14" y="92" fill="#777768"> ⌁ <tspan fill="#D89B7E">.../PickerContext.tsx</tspan></text>
+    </g>
+
+    <g transform="translate(56 360)">
+      <rect width="200" height="118" rx="10" fill="rgba(26,25,22,0.35)" stroke="rgba(236,231,220,0.08)"/>
+      <text x="14" y="22" fill="#D89B7E">V7 split-bar</text>
+      <text x="14" y="46" fill="#777768">╴ <tspan fill="#8FB4CE" font-weight="700"> READING </tspan> turn 7 ╴──</text>
+      <text x="14" y="70" fill="#B0B0A5"> ⠋ scanning callers...</text>
+      <text x="14" y="94" fill="#777768">╴ file <tspan fill="#8FB4CE">.../hooks.ts</tspan> ╴──</text>
+    </g>
+
+    <g transform="translate(280 360)">
+      <rect width="200" height="118" rx="10" fill="rgba(26,25,22,0.35)" stroke="rgba(236,231,220,0.08)"/>
+      <text x="14" y="22" fill="#D89B7E">V8 micro-log</text>
+      <text x="14" y="48" fill="#D9B670">● <tspan fill="#ECE7DC" font-weight="700">thinking</tspan>...</text>
+      <text x="14" y="70" fill="#777768">│  <tspan fill="#B0B0A5">planning the refactor</tspan></text>
+      <text x="14" y="92" fill="#777768">╰─file <tspan fill="#D9B670">.../FilePicker.tsx</tspan></text>
+    </g>
+
+    <g transform="translate(504 360)">
+      <rect width="200" height="118" rx="10" fill="rgba(26,25,22,0.35)" stroke="rgba(236,231,220,0.08)"/>
+      <text x="14" y="22" fill="#D89B7E">V9 stamp head</text>
+      <text x="14" y="48" fill="#D89B7E" font-weight="700"> EXECUTING </text>
+      <text x="92" y="48" fill="#B0B0A5">⠋ applying edit...</text>
+      <text x="14" y="70" fill="#777768">           ─────────────</text>
+      <text x="14" y="92" fill="#777768">           ↳ file <tspan fill="#D89B7E">.../ctx.tsx</tspan></text>
     </g>
   </g>
 </svg>

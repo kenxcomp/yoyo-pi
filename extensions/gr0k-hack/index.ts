@@ -30,9 +30,11 @@ const STATE_PATH = resolve(getAgentDir(), "state", "gr0k-hack.json");
 const HIDE_DELAY_MS = 1200;
 const MAX_CHANGED_FILES = 8;
 
-const agentStatusVariantNumbers = [1, 2, 3, 4] as const;
+const agentStatusVariantNumbers = [1, 2, 3, 4, 5, 6, 7, 8, 9] as const;
 type AgentStatusVariant = (typeof agentStatusVariantNumbers)[number];
-type AgentPhase = "thinking" | "executing" | "reading";
+type AgentPhase = "thinking" | "executing" | "reading" | "writing";
+type AgentTone = "red" | "yel" | "grn" | "blu" | "pur";
+type AgentFillTone = "fred" | "fyel" | "fgrn" | "fblu" | "fdim";
 
 type PersistedGr0kHackState = {
 	enabled?: boolean;
@@ -53,18 +55,100 @@ type AgentStatusRuntimeState = {
 	phase: AgentPhase;
 	latestText: string;
 	latestTextSynthetic: boolean;
+	lastActivityText?: string;
 	currentPath?: string;
 	changedFiles: string[];
 	activeTools: Map<string, ToolActivity>;
 	requestRender?: () => void;
 	hideTimer?: ReturnType<typeof setTimeout>;
+	renderTicker?: ReturnType<typeof setInterval>;
+};
+
+type AgentStatusScenario = {
+	label: AgentPhase;
+	tone: AgentTone;
+	tonefill: AgentFillTone;
+	glyph: string;
+	thought: string;
+	file: string;
+};
+
+type TuiPalette = {
+	red: string;
+	yel: string;
+	grn: string;
+	blu: string;
+	pur: string;
+	dim: string;
+	faint: string;
+	redBg: string;
+	yelBg: string;
+	grnBg: string;
+	bluBg: string;
+	dimBg: string;
+};
+
+const RENDER_TICK_MS = 90;
+const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"] as const;
+const DOT_FRAMES = ["   ", ".  ", ".. ", "..."] as const;
+const TUI_VARIANT_WIDTH = 86;
+const TUI_MICRO_WIDTH = 64;
+
+const TUI_PALETTES: Record<string, TuiPalette> = {
+	dark: {
+		red: "#D89B7E",
+		yel: "#D9B670",
+		grn: "#ADC79A",
+		blu: "#8FB4CE",
+		pur: "#BCA0C5",
+		dim: "#B0B0A5",
+		faint: "#777768",
+		redBg: "#464139",
+		yelBg: "#494739",
+		grnBg: "#40473D",
+		bluBg: "#3A4241",
+		dimBg: "#383A36",
+	},
+	light: {
+		red: "#A8734F",
+		yel: "#A88A50",
+		grn: "#6F8A68",
+		blu: "#5F8880",
+		pur: "#8A6E9C",
+		dim: "#6B6B60",
+		faint: "#9A9A8E",
+		redBg: "#EDE4DA",
+		yelBg: "#EDE7DB",
+		grnBg: "#E8E7DD",
+		bluBg: "#E6E6DF",
+		dimBg: "#E9DDD1",
+	},
+	paper: {
+		red: "#8C2A1F",
+		yel: "#8A6A1F",
+		grn: "#3F5C45",
+		blu: "#2F5A78",
+		pur: "#6E4A78",
+		dim: "#5B524A",
+		faint: "#8C8175",
+		redBg: "#E5D4C2",
+		yelBg: "#E3D8BE",
+		grnBg: "#DAD6C3",
+		bluBg: "#DCD9CB",
+		dimBg: "#DDC5B3",
+	},
 };
 
 const agentStatusVariantLabels: Record<AgentStatusVariant, string> = {
-	1: "Grok web rail",
-	2: "thin terminal frame",
-	3: "soft status chips",
-	4: "blueprint pulse",
+	1: "hairline readout",
+	2: "phase tag",
+	3: "left-rail accent",
+	4: "soft card",
+	5: "margin labels",
+	6: "sigil prefix",
+	7: "split-bar",
+	8: "micro-log",
+	9: "stamp head",
 };
 
 let persistedState = loadPersistedState();
@@ -92,16 +176,19 @@ export default function gr0kHackExtension(pi: ExtensionAPI) {
 	pi.on("session_shutdown", (_event, ctx) => {
 		if (!ctx.hasUI) return;
 		clearHideTimer();
+		stopAgentStatusTicker();
 		agentStatusState.active = false;
 		agentStatusState.activeTools.clear();
 		ctx.ui.setWidget(WIDGET_KEY, undefined);
 		ctx.ui.setWorkingVisible(true);
 		ctx.ui.setWorkingIndicator();
 		ctx.ui.setWorkingMessage();
+		ctx.ui.setHiddenThinkingLabel();
 		agentStatusState.requestRender = undefined;
 	});
 
 	pi.on("before_agent_start", () => {
+		agentStatusState.lastActivityText = undefined;
 		startAgentStatusTurn("thinking");
 	});
 
@@ -123,9 +210,11 @@ export default function gr0kHackExtension(pi: ExtensionAPI) {
 		if (!isAssistantMessage(event.message)) return;
 		const text = extractLatestVisibleAssistantText(event.message);
 		if (!text) return;
-		agentStatusState.latestText = text;
-		agentStatusState.latestTextSynthetic = false;
-		if (agentStatusState.activeTools.size === 0) agentStatusState.phase = "thinking";
+		if (agentStatusState.activeTools.size === 0) {
+			agentStatusState.latestText = text;
+			agentStatusState.latestTextSynthetic = false;
+			agentStatusState.phase = "thinking";
+		}
 		activateAgentStatus();
 	});
 
@@ -141,6 +230,8 @@ export default function gr0kHackExtension(pi: ExtensionAPI) {
 	pi.on("tool_execution_start", (event, ctx) => {
 		const phase = phaseForTool(event.toolName);
 		const path = pathForTool(event.toolName, event.args, ctx.cwd);
+		const activityText = activityTextForTool(event.toolName, event.args, ctx.cwd);
+		if (activityText) agentStatusState.lastActivityText = activityText;
 		agentStatusState.activeTools.set(event.toolCallId, {
 			name: event.toolName,
 			phase,
@@ -149,10 +240,8 @@ export default function gr0kHackExtension(pi: ExtensionAPI) {
 		});
 		agentStatusState.phase = phase;
 		if (path) agentStatusState.currentPath = path;
-		if (!agentStatusState.latestText || agentStatusState.latestTextSynthetic) {
-			agentStatusState.latestText = syntheticToolText(event.toolName, path);
-			agentStatusState.latestTextSynthetic = true;
-		}
+		agentStatusState.latestText = activityText ?? syntheticToolText(event.toolName, path);
+		agentStatusState.latestTextSynthetic = true;
 		activateAgentStatus();
 	});
 
@@ -160,6 +249,12 @@ export default function gr0kHackExtension(pi: ExtensionAPI) {
 		const existing = agentStatusState.activeTools.get(event.toolCallId);
 		if (!existing) return;
 		const path = pathForTool(event.toolName, event.args, ctx.cwd) ?? existing.path;
+		const activityText = activityTextForTool(event.toolName, event.args, ctx.cwd);
+		if (activityText) {
+			agentStatusState.lastActivityText = activityText;
+			agentStatusState.latestText = activityText;
+			agentStatusState.latestTextSynthetic = true;
+		}
 		existing.path = path;
 		if (path) agentStatusState.currentPath = path;
 		agentStatusState.phase = existing.phase;
@@ -168,6 +263,12 @@ export default function gr0kHackExtension(pi: ExtensionAPI) {
 
 	pi.on("tool_result", (event, ctx) => {
 		if (event.isError) return;
+		const activityText = activityTextForToolResult(event.toolName, event.input, event.content, ctx.cwd);
+		if (activityText) {
+			agentStatusState.lastActivityText = activityText;
+			agentStatusState.latestText = activityText;
+			agentStatusState.latestTextSynthetic = true;
+		}
 		if (event.toolName !== "edit" && event.toolName !== "write") return;
 		const path = pathForTool(event.toolName, event.input, ctx.cwd);
 		if (path) addChangedFile(path);
@@ -190,7 +291,7 @@ export default function gr0kHackExtension(pi: ExtensionAPI) {
 			if (agentStatusState.latestTextSynthetic) {
 				agentStatusState.latestText = event.isError
 					? `${activity?.name ?? event.toolName} failed`
-					: `${activity?.name ?? event.toolName} complete`;
+					: (agentStatusState.lastActivityText ?? `${activity?.name ?? event.toolName} complete`);
 			}
 		}
 		activateAgentStatus();
@@ -210,7 +311,7 @@ export default function gr0kHackExtension(pi: ExtensionAPI) {
 
 function registerAgentStatusCommand(pi: ExtensionAPI, name: "switch-agentStatus"): void {
 	pi.registerCommand(name, {
-		description: "Switch gr0k-hack three-line agent status UI (1-4). Use 0/off to restore pi's default loader.",
+		description: "Switch gr0k-hack agent status UI (1-9). Use 0/off to restore pi's default loader.",
 		getArgumentCompletions: (prefix: string) => {
 			const p = prefix.trim().toLowerCase();
 			const items = [
@@ -237,7 +338,7 @@ function registerAgentStatusCommand(pi: ExtensionAPI, name: "switch-agentStatus"
 				return;
 			}
 			if (parsed === undefined) {
-				ctx.ui.notify("Usage: /switch-agentStatus <1-4|0|off|status>", "warning");
+				ctx.ui.notify("Usage: /switch-agentStatus <1-9|v1-v9|0|off|status>", "warning");
 				return;
 			}
 
@@ -262,7 +363,9 @@ function parseAgentStatusArg(args: string): AgentStatusVariant | 0 | "status" | 
 	const value = args.trim().toLowerCase();
 	if (!value || value === "status") return "status";
 	if (["0", "off", "default", "reset", "false", "disable", "disabled"].includes(value)) return 0;
-	const numeric = Number.parseInt(value, 10);
+	const normalized = value.startsWith("v") ? value.slice(1) : value;
+	if (!/^\d+$/.test(normalized)) return undefined;
+	const numeric = Number.parseInt(normalized, 10);
 	return isAgentStatusVariant(numeric) ? numeric : undefined;
 }
 
@@ -278,11 +381,14 @@ function applyAgentStatusUI(ctx: ExtensionContext): void {
 		ctx.ui.setWorkingVisible(true);
 		ctx.ui.setWorkingIndicator();
 		ctx.ui.setWorkingMessage();
+		ctx.ui.setHiddenThinkingLabel();
+		stopAgentStatusTicker();
 		return;
 	}
 
 	ctx.ui.setWorkingVisible(false);
 	ctx.ui.setWorkingIndicator({ frames: [] });
+	ctx.ui.setHiddenThinkingLabel("");
 	ctx.ui.setWidget(WIDGET_KEY, (tui, theme) => new AgentStatusWidget(tui, theme, agentStatusState), {
 		placement: "aboveEditor",
 	});
@@ -305,7 +411,7 @@ class AgentStatusWidget implements Component {
 		if (!this.state.enabled || !this.state.active) return [];
 		const w = Math.max(1, width);
 		const lines = renderAgentStatusLines(this.state, this.theme, w);
-		return [0, 1, 2].map((index) => fitLine(lines[index] ?? "", w));
+		return lines.map((line) => fitLine(line, w));
 	}
 
 	invalidate(): void {}
@@ -316,58 +422,359 @@ class AgentStatusWidget implements Component {
 }
 
 function renderAgentStatusLines(state: AgentStatusRuntimeState, theme: Theme, _width: number): string[] {
-	const phaseLabel = state.phase.toUpperCase();
-	const prompt = cleanInline(state.latestText) || "Waiting for model…";
-	const path = displayPath(state);
-	const phase = colorPhase(theme, state.phase, phaseLabel);
-	const dimPrompt = theme.fg("muted", prompt);
-	const file = theme.fg("mdLink", path);
-	const accentFile = theme.fg("accent", path);
-	const faint = (value: string) => theme.fg("dim", value);
-	const variant = isAgentStatusVariant(state.variant) ? state.variant : 1;
+	const scenario = scenarioForState(state);
+	const markupLines = buildAgentStatusVariant(state.variant, scenario);
+	return markupLines.map((line) => renderTuiMarkup(line, theme));
+}
 
-	switch (variant) {
-		case 2:
-			return [
-				`${faint("╭─")} ${phase}`,
-				`${faint("│ ")}${dimPrompt}`,
-				`${faint("╰─↳ ")}${file}`,
-			];
-		case 3:
-			return [
-				`${theme.fg("borderMuted", "[")} ${phase} ${theme.fg("borderMuted", "]")}`,
-				`${theme.fg("accent", "›")} ${dimPrompt}`,
-				`${theme.fg("mdLink", "↳")} ${accentFile}`,
-			];
-		case 4: {
-			const rail = theme.fg("mdLink", "▌");
-			return [
-				`${rail} ${phase}`,
-				`${rail} ${theme.fg("thinkingText", prompt)}`,
-				`${rail} ${theme.fg("mdLink", "↳")} ${file}`,
-			];
-		}
-		case 1:
+function scenarioForState(state: AgentStatusRuntimeState): AgentStatusScenario {
+	const thought = cleanInline(state.latestText) || "Waiting for model…";
+	const file = displayPath(state);
+
+	switch (state.phase) {
+		case "executing":
+			return { label: "executing", tone: "red", tonefill: "fred", glyph: "▶", thought, file };
+		case "reading":
+			return { label: "reading", tone: "blu", tonefill: "fblu", glyph: "◐", thought, file };
+		case "writing":
+			return { label: "writing", tone: "grn", tonefill: "fgrn", glyph: "✎", thought, file };
+		case "thinking":
 		default:
-			return [
-				`${theme.fg("warning", "●")} ${phase}`,
-				`  ${dimPrompt}`,
-				`  ${theme.fg("mdLink", "↳")} ${file}`,
-			];
+			return { label: "thinking", tone: "yel", tonefill: "fyel", glyph: "✱", thought, file };
 	}
 }
 
-function colorPhase(theme: Theme, phase: AgentPhase, label: string): string {
-	const bold = theme.bold(label);
-	switch (phase) {
-		case "reading":
-			return theme.fg("mdLink", bold);
-		case "executing":
-			return theme.fg("success", bold);
-		case "thinking":
+function buildAgentStatusVariant(variant: AgentStatusVariant, scn: AgentStatusScenario): string[] {
+	switch (variant) {
+		case 2:
+			return v2Step(scn);
+		case 3:
+			return v3Rail(scn);
+		case 4:
+			return v4Card(scn);
+		case 5:
+			return v5Margin(scn);
+		case 6:
+			return v6Sigil(scn);
+		case 7:
+			return v7Split(scn);
+		case 8:
+			return v8Micro(scn);
+		case 9:
+			return v9Stamp(scn);
+		case 1:
 		default:
-			return theme.fg("warning", bold);
+			return v1Hairline(scn);
 	}
+}
+
+function v1Hairline(scn: AgentStatusScenario): string[] {
+	const W = TUI_VARIANT_WIDTH;
+	const badge = `«${scn.tonefill}» ${scn.label.toUpperCase()} «/»`;
+	return [
+		" " + badge + "   «spin» «" + scn.tone + "»" + scn.glyph + "«/»  «faint»" + new Date().toLocaleTimeString([], { hour12: false }) + "«/»",
+		" «dim»" + tuiPad(scn.thought + "«dots»", W - 2) + "«/»",
+		" «faint»↳«/»  «" + scn.tone + "»" + truncStart(scn.file, W - 6) + "«/»",
+	];
+}
+
+function v2Step(scn: AgentStatusScenario): string[] {
+	const W = TUI_VARIANT_WIDTH;
+	return [
+		" «faint»[agent] «/»«" + scn.tone + "»" + scn.label.toUpperCase() + "«/»«dots»",
+		" «dim»❝ " + scn.thought + " ❞«/»",
+		" «faint»file «/»«" + scn.tone + "»" + truncStart(scn.file, W - 8) + "«/»",
+	];
+}
+
+function v3Rail(scn: AgentStatusScenario): string[] {
+	const W = TUI_VARIANT_WIDTH;
+	return [
+		"«" + scn.tone + "»▌«/» «b»" + scn.label.toUpperCase() + "«/»  «spin» «faint»agent · turn 7«/»",
+		"«" + scn.tone + "»▌«/» «dim»" + scn.thought + "«/»«dots»",
+		"«" + scn.tone + "»▌«/» «faint»↳«/» «" + scn.tone + "»" + truncStart(scn.file, W - 6) + "«/»",
+	];
+}
+
+function v4Card(scn: AgentStatusScenario): string[] {
+	const W = TUI_VARIANT_WIDTH;
+	const inner = W - 2;
+	const head = " «spin»  «b»" + scn.label.toUpperCase() + "«/»«dots»" + "  «faint»·  agent · turn 7«/»";
+	const mid = " «dim»" + scn.thought + "«/»";
+	const foot = " «faint»↳«/» «" + scn.tone + "»" + truncStart(scn.file, inner - 4) + "«/»";
+	return [
+		"╭" + "─".repeat(W - 2) + "╮",
+		"│" + tuiPad(head, inner) + "│",
+		"├" + "┄".repeat(W - 2) + "┤",
+		"│" + tuiPad(mid, inner) + "│",
+		"│" + tuiPad(foot, inner) + "│",
+		"╰" + "─".repeat(W - 2) + "╯",
+	];
+}
+
+function v5Margin(scn: AgentStatusScenario): string[] {
+	const W = TUI_VARIANT_WIDTH;
+	const G = 12;
+	const m = (value: string) => tuiPad(value, G);
+	return [
+		m("«faint»state«/»") + "«" + scn.tonefill + "» " + scn.label.toUpperCase() + " «/»" + "   «spin»  «faint»turn 7«/»",
+		m("«faint»thought«/»") + "«dim»" + scn.thought + "«/»«dots»",
+		m("«faint»file«/»") + "«" + scn.tone + "»" + truncStart(scn.file, W - G) + "«/»",
+	];
+}
+
+function v6Sigil(scn: AgentStatusScenario): string[] {
+	const W = TUI_VARIANT_WIDTH;
+	return [
+		"«faint»::«/» «" + scn.tone + "»" + scn.label + "«/»«dots»" + "   «faint»turn 7 · 1.4s«/»",
+		"«faint» ›«/» «dim»" + scn.thought + "«/»",
+		"«faint» ⌁«/» «" + scn.tone + "»" + truncStart(scn.file, W - 6) + "«/»",
+	];
+}
+
+function v7Split(scn: AgentStatusScenario): string[] {
+	const W = TUI_VARIANT_WIDTH;
+	const topTab = `╴ «${scn.tonefill}» ${scn.label.toUpperCase()} «/» «faint»turn 7«/» ╴`;
+	const topPad = W - tuiLen(topTab);
+	const file = truncStart(scn.file, W - 14);
+	const botTab = `«faint»╴«/» «faint»file«/» «${scn.tone}»${file}«/» «faint»╴«/»`;
+	const botPad = W - tuiLen(botTab);
+	return [
+		topTab + "«faint»" + "─".repeat(Math.max(2, topPad)) + "«/»",
+		"",
+		" «spin»  «dim»" + scn.thought + "«/»«dots»",
+		"",
+		botTab + "«faint»" + "─".repeat(Math.max(2, botPad)) + "«/»",
+	];
+}
+
+function v8Micro(scn: AgentStatusScenario): string[] {
+	const W = TUI_MICRO_WIDTH;
+	return [
+		"«" + scn.tone + "»●«/» «b»" + scn.label + "«/»" + "«dots»",
+		"«faint»│«/»  «dim»" + scn.thought + "«/»",
+		"«faint»╰─«/»«faint»file «/»«" + scn.tone + "»" + truncStart(scn.file, W - 12) + "«/»",
+	];
+}
+
+function v9Stamp(scn: AgentStatusScenario): string[] {
+	const W = TUI_VARIANT_WIDTH;
+	return [
+		"«" + scn.tonefill + "» " + scn.label.toUpperCase().padEnd(9, " ") + "«/» «spin»  «dim»" + scn.thought + "«/»«dots»",
+		" ".repeat(11) + "«faint»" + "─".repeat(W - 12) + "«/»",
+		" ".repeat(11) + "«faint»↳ file«/»  «" + scn.tone + "»" + truncStart(scn.file, W - 22) + "«/»",
+	];
+}
+
+function renderTuiMarkup(line: string, theme: Theme): string {
+	const out: string[] = [];
+	const stack: string[] = [];
+	let buf = "";
+	let i = 0;
+	const flush = () => {
+		if (!buf) return;
+		out.push(applyTuiTokens(buf, stack, theme));
+		buf = "";
+	};
+
+	while (i < line.length) {
+		if (line[i] === "«" && line.charAt(i + 1) === "/" && line.charAt(i + 2) === "»") {
+			flush();
+			stack.pop();
+			i += 3;
+		} else if (line[i] === "«") {
+			const close = line.indexOf("»", i + 1);
+			if (close === -1) {
+				buf += line[i];
+				i++;
+				continue;
+			}
+			flush();
+			const tok = line.slice(i + 1, close);
+			if (tok === "spin") {
+				out.push(currentSpinnerFrame());
+			} else if (tok === "dots") {
+				out.push(currentDotFrame());
+			} else if (tok === "pulse") {
+				out.push("      ");
+			} else {
+				stack.push(tok);
+			}
+			i = close + 1;
+		} else {
+			buf += line[i];
+			i++;
+		}
+	}
+	flush();
+	return out.join("");
+}
+
+function applyTuiTokens(text: string, tokens: readonly string[], theme: Theme): string {
+	let styled = text;
+	let fgToken: AgentTone | "dim" | "faint" | undefined;
+	let fillToken: AgentFillTone | undefined;
+	let bold = false;
+	let italic = false;
+
+	for (const token of tokens) {
+		switch (token) {
+			case "red":
+			case "yel":
+			case "grn":
+			case "blu":
+			case "pur":
+			case "dim":
+			case "faint":
+				fgToken = token;
+				break;
+			case "fred":
+			case "fyel":
+			case "fgrn":
+			case "fblu":
+			case "fdim":
+				fillToken = token;
+				break;
+			case "b":
+				bold = true;
+				break;
+			case "it":
+				italic = true;
+				break;
+		}
+	}
+
+	if (bold) styled = theme.bold(styled);
+	if (italic) styled = theme.italic(styled);
+	if (fgToken) styled = applyTuiFg(theme, fgToken, styled);
+	if (fillToken) styled = applyTuiFill(theme, fillToken, styled);
+	return styled;
+}
+
+function applyTuiFg(theme: Theme, token: AgentTone | "dim" | "faint", text: string): string {
+	const palette = paletteForTheme(theme);
+	if (palette) return ansiFg(palette[token], text);
+
+	switch (token) {
+		case "red":
+			return theme.fg("accent", text);
+		case "yel":
+			return theme.fg("warning", text);
+		case "grn":
+			return theme.fg("success", text);
+		case "blu":
+			return theme.fg("mdLink", text);
+		case "pur":
+			return theme.fg("syntaxNumber", text);
+		case "dim":
+			return theme.fg("muted", text);
+		case "faint":
+		default:
+			return theme.fg("dim", text);
+	}
+}
+
+function applyTuiFill(theme: Theme, token: AgentFillTone, text: string): string {
+	const palette = paletteForTheme(theme);
+	if (palette) {
+		const colorToken = fillToColorToken(token);
+		const fg = colorToken ? ansiFg(palette[colorToken], text) : text;
+		return ansiBg(palette[fillToBgKey(token)], fg);
+	}
+
+	switch (token) {
+		case "fred":
+			return theme.bg("toolErrorBg", theme.fg("accent", text));
+		case "fyel":
+			return theme.bg("selectedBg", theme.fg("warning", text));
+		case "fgrn":
+			return theme.bg("toolSuccessBg", theme.fg("success", text));
+		case "fblu":
+			return theme.bg("toolPendingBg", theme.fg("mdLink", text));
+		case "fdim":
+		default:
+			return theme.bg("selectedBg", text);
+	}
+}
+
+function fillToColorToken(token: AgentFillTone): AgentTone | undefined {
+	switch (token) {
+		case "fred":
+			return "red";
+		case "fyel":
+			return "yel";
+		case "fgrn":
+			return "grn";
+		case "fblu":
+			return "blu";
+		case "fdim":
+		default:
+			return undefined;
+	}
+}
+
+function fillToBgKey(token: AgentFillTone): keyof TuiPalette {
+	switch (token) {
+		case "fred":
+			return "redBg";
+		case "fyel":
+			return "yelBg";
+		case "fgrn":
+			return "grnBg";
+		case "fblu":
+			return "bluBg";
+		case "fdim":
+		default:
+			return "dimBg";
+	}
+}
+
+function paletteForTheme(theme: Theme): TuiPalette | undefined {
+	const key = (theme.name ?? "").toLowerCase();
+	return TUI_PALETTES[key];
+}
+
+function ansiFg(hex: string, text: string): string {
+	const rgb = hexToRgb(hex);
+	return rgb ? `\x1b[38;2;${rgb.r};${rgb.g};${rgb.b}m${text}\x1b[39m` : text;
+}
+
+function ansiBg(hex: string, text: string): string {
+	const rgb = hexToRgb(hex);
+	return rgb ? `\x1b[48;2;${rgb.r};${rgb.g};${rgb.b}m${text}\x1b[49m` : text;
+}
+
+function hexToRgb(hex: string): { r: number; g: number; b: number } | undefined {
+	const match = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
+	if (!match) return undefined;
+	const value = Number.parseInt(match[1], 16);
+	return { r: (value >> 16) & 255, g: (value >> 8) & 255, b: value & 255 };
+}
+
+function currentSpinnerFrame(): string {
+	return SPINNER_FRAMES[Math.floor(Date.now() / RENDER_TICK_MS) % SPINNER_FRAMES.length];
+}
+
+function currentDotFrame(): string {
+	return DOT_FRAMES[Math.floor(Date.now() / 350) % DOT_FRAMES.length];
+}
+
+function tuiLen(line: string): number {
+	return line.replace(/«spin»|«dots»|«pulse»/g, " ").replace(/«[^»]*»/g, "").length;
+}
+
+function tuiPad(line: string, width: number, fill = " "): string {
+	const n = tuiLen(line);
+	if (n >= width) return line;
+	return line + fill.repeat(width - n);
+}
+
+function truncStart(value: string, width: number): string {
+	if (width <= 0) return "";
+	const s = cleanInline(value);
+	if (s.length <= width) return s;
+	if (width === 1) return "…";
+	return "…" + s.slice(s.length - width + 1);
 }
 
 function fitLine(line: string, width: number): string {
@@ -381,9 +788,10 @@ function displayPath(state: AgentStatusRuntimeState): string {
 
 function startAgentStatusTurn(phase: AgentPhase): void {
 	clearHideTimer();
+	startAgentStatusTicker();
 	agentStatusState.active = true;
 	agentStatusState.phase = phase;
-	agentStatusState.latestText = "Thinking…";
+	agentStatusState.latestText = agentStatusState.lastActivityText ?? "Waiting for next model output…";
 	agentStatusState.latestTextSynthetic = true;
 	agentStatusState.currentPath = agentStatusState.changedFiles[agentStatusState.changedFiles.length - 1];
 	requestAgentStatusRender();
@@ -391,6 +799,7 @@ function startAgentStatusTurn(phase: AgentPhase): void {
 
 function setAgentStatusPhase(phase: AgentPhase): void {
 	clearHideTimer();
+	startAgentStatusTicker();
 	agentStatusState.active = true;
 	agentStatusState.phase = phase;
 	requestAgentStatusRender();
@@ -398,6 +807,7 @@ function setAgentStatusPhase(phase: AgentPhase): void {
 
 function activateAgentStatus(): void {
 	clearHideTimer();
+	startAgentStatusTicker();
 	agentStatusState.active = true;
 	requestAgentStatusRender();
 }
@@ -408,6 +818,7 @@ function scheduleHideAgentStatus(): void {
 		agentStatusState.hideTimer = undefined;
 		agentStatusState.active = false;
 		requestAgentStatusRender();
+		stopAgentStatusTicker();
 	}, HIDE_DELAY_MS);
 }
 
@@ -420,6 +831,17 @@ function clearHideTimer(): void {
 function requestAgentStatusRender(): void {
 	if (!agentStatusState.enabled) return;
 	agentStatusState.requestRender?.();
+}
+
+function startAgentStatusTicker(): void {
+	if (!agentStatusState.enabled || agentStatusState.renderTicker) return;
+	agentStatusState.renderTicker = setInterval(requestAgentStatusRender, RENDER_TICK_MS);
+}
+
+function stopAgentStatusTicker(): void {
+	if (!agentStatusState.renderTicker) return;
+	clearInterval(agentStatusState.renderTicker);
+	agentStatusState.renderTicker = undefined;
 }
 
 function newestActiveTool(): ToolActivity | undefined {
@@ -444,6 +866,7 @@ function addChangedFile(filePath: string): void {
 
 function phaseForTool(toolName: string): AgentPhase {
 	if (toolName === "read" || toolName === "grep" || toolName === "find" || toolName === "ls") return "reading";
+	if (toolName === "edit" || toolName === "write") return "writing";
 	return "executing";
 }
 
@@ -452,12 +875,86 @@ function syntheticToolText(toolName: string, path?: string): string {
 	switch (phaseForTool(toolName)) {
 		case "reading":
 			return `reading${target}`;
+		case "writing":
+			return `${toolName === "write" ? "writing" : "editing"}${target}`;
 		case "executing":
 			return `${toolName}${target}`;
 		case "thinking":
 		default:
-			return "Thinking…";
+			return "Waiting for model output…";
 	}
+}
+
+function activityTextForTool(toolName: string, args: unknown, cwd: string): string | undefined {
+	const path = pathForTool(toolName, args, cwd);
+	const subject = path ? ` ${path}` : "";
+	const suffix = activitySuffixForToolInput(toolName, args);
+	return `${toolName.toUpperCase()}${subject}${suffix ? `  ${suffix}` : ""}`;
+}
+
+function activityTextForToolResult(toolName: string, input: unknown, content: unknown, cwd: string): string | undefined {
+	const path = pathForTool(toolName, input, cwd);
+	const subject = path ? ` ${path}` : "";
+	const suffix = activitySuffixForToolResult(toolName, input, content) ?? activitySuffixForToolInput(toolName, input);
+	return `${toolName.toUpperCase()}${subject}${suffix ? `  ${suffix}` : ""}`;
+}
+
+function activitySuffixForToolInput(toolName: string, input: unknown): string | undefined {
+	const record = isRecord(input) ? input : {};
+	switch (toolName) {
+		case "write": {
+			const content = typeof record.content === "string" ? record.content : "";
+			return `${lineCount(content)} lines`;
+		}
+		case "edit": {
+			const count = Array.isArray(record.edits) ? record.edits.length : 0;
+			return count > 0 ? `${count} replacements` : undefined;
+		}
+		case "grep": {
+			const pattern = typeof record.pattern === "string" ? cleanInline(record.pattern) : "";
+			return pattern ? `/${truncateToWidth(pattern, 64, "…")}/` : undefined;
+		}
+		case "find": {
+			const pattern = typeof record.pattern === "string" ? cleanInline(record.pattern) : "";
+			return pattern || undefined;
+		}
+		case "read": {
+			const parts = [typeof record.offset === "number" ? `offset=${record.offset}` : undefined, typeof record.limit === "number" ? `limit=${record.limit}` : undefined].filter(Boolean);
+			return parts.join(", ") || undefined;
+		}
+		case "bash": {
+			const timeout = typeof record.timeout === "number" ? `timeout=${record.timeout}s` : "";
+			return timeout || undefined;
+		}
+		default:
+			return undefined;
+	}
+}
+
+function activitySuffixForToolResult(toolName: string, input: unknown, content: unknown): string | undefined {
+	switch (toolName) {
+		case "read":
+			return `${lineCount(firstTextFromContent(content))} lines`;
+		case "grep":
+			return `${lineCount(firstTextFromContent(content))} matching lines`;
+		case "find":
+			return `${lineCount(firstTextFromContent(content))} paths`;
+		case "ls":
+			return `${lineCount(firstTextFromContent(content))} entries`;
+		case "bash":
+			return `${lineCount(firstTextFromContent(content))} output lines`;
+		case "write":
+		case "edit":
+			return activitySuffixForToolInput(toolName, input);
+		default:
+			return undefined;
+	}
+}
+
+function firstTextFromContent(content: unknown): string {
+	if (!Array.isArray(content)) return "";
+	const first = content[0];
+	return isRecord(first) && first.type === "text" && typeof first.text === "string" ? first.text : "";
 }
 
 function pathForTool(toolName: string, args: unknown, cwd: string): string | undefined {
