@@ -51,6 +51,14 @@ Direct jumps: [V1](https://htmlpreview.github.io/?https://github.com/kenxcomp/yo
 
 ## Install
 
+From npm after publishing:
+
+```bash
+pi install npm:yoyo-pi
+```
+
+Or install directly from GitHub:
+
 ```bash
 pi install git:git@github.com:kenxcomp/yoyo-pi.git
 ```
@@ -61,7 +69,7 @@ Temporary test without installing:
 pi -e git:git@github.com:kenxcomp/yoyo-pi.git
 ```
 
-The unpinned Git URL follows `main` when you run `pi update`. Pin a tag only when you want a reproducible release, for example `git:git@github.com:kenxcomp/yoyo-pi.git@v0.1.3`.
+The unpinned Git URL follows `main` when you run `pi update`. Pin a tag only when you want a reproducible release, for example `git:git@github.com:kenxcomp/yoyo-pi.git@v0.1.4`.
 
 After installing this package, remove or move the old local copies under `~/.pi/agent/extensions/` to avoid duplicate slash commands.
 

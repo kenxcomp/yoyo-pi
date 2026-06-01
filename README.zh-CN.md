@@ -51,6 +51,14 @@
 
 ## 安装
 
+发布到 npm 后可以这样安装：
+
+```bash
+pi install npm:yoyo-pi
+```
+
+也可以继续直接从 GitHub 安装：
+
 ```bash
 pi install git:git@github.com:kenxcomp/yoyo-pi.git
 ```
@@ -61,7 +69,7 @@ pi install git:git@github.com:kenxcomp/yoyo-pi.git
 pi -e git:git@github.com:kenxcomp/yoyo-pi.git
 ```
 
-未固定版本的 Git URL 会在你运行 `pi update` 时跟随 `main`。只有在需要可复现版本时才固定 tag，例如 `git:git@github.com:kenxcomp/yoyo-pi.git@v0.1.3`。
+未固定版本的 Git URL 会在你运行 `pi update` 时跟随 `main`。只有在需要可复现版本时才固定 tag，例如 `git:git@github.com:kenxcomp/yoyo-pi.git@v0.1.4`。
 
 安装本包后，请删除或移走 `~/.pi/agent/extensions/` 下旧的本地副本，避免重复注册 slash commands。
 

@@ -1,6 +1,6 @@
 {
   "name": "yoyo-pi",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Polished pi extension pack: Vim prompt editing, choice pickers, themes, status bars, file/todo sidebars, context snapshots, and plan mode.",
   "type": "module",
   "keywords": [
@@ -12,6 +12,22 @@
     "vim"
   ],
   "license": "MIT",
+  "homepage": "https://github.com/kenxcomp/yoyo-pi#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/kenxcomp/yoyo-pi.git"
+  },
+  "bugs": {
+    "url": "https://github.com/kenxcomp/yoyo-pi/issues"
+  },
+  "files": [
+    "extensions/",
+    "docs/previews/",
+    "README.zh-CN.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "pi": {
     "extensions": [
       "./extensions/clear-context.ts",
@@ -20,7 +36,8 @@
       "./extensions/kenx-infra/index.ts",
       "./extensions/gr0k-hack/index.ts",
       "./extensions/plan-mode/index.ts"
-    ]
+    ],
+    "image": "https://raw.githubusercontent.com/kenxcomp/yoyo-pi/main/docs/previews/status-bar.png"
   },
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*",
