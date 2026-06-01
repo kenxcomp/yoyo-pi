@@ -1,7 +1,7 @@
 # yoyo-pi
 
 <p align="right">
-  <a href="README.md"><img src="https://img.shields.io/badge/Language-English-blue" alt="English"></a>
+  <a href="../README.md"><img src="https://img.shields.io/badge/Language-English-blue" alt="English"></a>
   <a href="README.zh-CN.md"><img src="https://img.shields.io/badge/%E8%AF%AD%E8%A8%80-%E7%AE%80%E4%BD%93%E4%B8%AD%E6%96%87-brightgreen" alt="简体中文"></a>
 </p>
 
@@ -23,13 +23,13 @@
 
 ### 状态栏与输入框变化
 
-<img src="docs/previews/status-bar.png" alt="状态栏与输入框变化预览" width="760">
+<img src="previews/status-bar.png" alt="状态栏与输入框变化预览" width="760">
 
 交互式 HTML 预览：[打开状态栏 playground](https://htmlpreview.github.io/?https://github.com/kenxcomp/yoyo-pi/blob/main/docs/previews/pi-tui-status-bar.html?v=9d4f442)。
 
 ### Agent 状态变化
 
-<img src="docs/previews/agent-status.svg" alt="Grok 风格 Agent 状态变化预览" width="760">
+<img src="previews/agent-status.svg" alt="Grok 风格 Agent 状态变化预览" width="760">
 
 交互式 HTML 预览：[打开 Agent status playground](https://htmlpreview.github.io/?https://github.com/kenxcomp/yoyo-pi/blob/main/docs/previews/pi-tui-agent-status.html?v=gr0k-hack-3#v1)。
 
@@ -37,17 +37,17 @@
 
 ### 文件树覆盖层
 
-<img src="docs/previews/filetree.png" alt="文件树覆盖层预览" width="260">
+<img src="previews/filetree.png" alt="文件树覆盖层预览" width="260">
 
 ### Todo 时间线侧边栏
 
-<img src="docs/previews/todo-sidebar.png" alt="Todo 时间线侧边栏预览" width="360">
+<img src="previews/todo-sidebar.png" alt="Todo 时间线侧边栏预览" width="360">
 
 ### 选择器
 
-<img src="docs/previews/single-choice.png" alt="单选选择器预览" width="720">
+<img src="previews/single-choice.png" alt="单选选择器预览" width="720">
 
-<img src="docs/previews/multiple-choice.png" alt="多选选择器预览" width="720">
+<img src="previews/multiple-choice.png" alt="多选选择器预览" width="720">
 
 ## 安装
 
@@ -69,7 +69,7 @@ pi install git:git@github.com:kenxcomp/yoyo-pi.git
 pi -e git:git@github.com:kenxcomp/yoyo-pi.git
 ```
 
-未固定版本的 Git URL 会在你运行 `pi update` 时跟随 `main`。只有在需要可复现版本时才固定 tag，例如 `git:git@github.com:kenxcomp/yoyo-pi.git@v0.1.4`。
+未固定版本的 Git URL 会在你运行 `pi update` 时跟随 `main`。只有在需要可复现版本时才固定 tag，例如 `git:git@github.com:kenxcomp/yoyo-pi.git@v0.1.5`。
 
 安装本包后，请删除或移走 `~/.pi/agent/extensions/` 下旧的本地副本，避免重复注册 slash commands。
 
