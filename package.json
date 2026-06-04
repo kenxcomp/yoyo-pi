@@ -1,6 +1,6 @@
 {
   "name": "yoyo-pi",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Polished pi extension pack: Vim prompt editing, choice pickers, themes, status bars, file/todo sidebars, context snapshots, and plan mode.",
   "type": "module",
   "keywords": [
