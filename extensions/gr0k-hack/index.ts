@@ -24,6 +24,9 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import type { Component, TUI } from "@earendil-works/pi-tui";
 import { Text, truncateToWidth } from "@earendil-works/pi-tui";
+import { registerQaAgentCommand } from "./qa-prompt.ts";
+import { registerSubagentTool } from "./qa-subagent.ts";
+import { registerQaWebSearchTool } from "./qa-web-search.ts";
 
 const WIDGET_KEY = "gr0k-hack.agent-status";
 const STATE_PATH = resolve(getAgentDir(), "state", "gr0k-hack.json");
@@ -166,6 +169,9 @@ const agentStatusState: AgentStatusRuntimeState = {
 
 export default function gr0kHackExtension(pi: ExtensionAPI) {
 	registerCompactBuiltinToolRenderers(pi);
+	registerSubagentTool(pi);
+	registerQaWebSearchTool(pi);
+	registerQaAgentCommand(pi);
 	registerAgentStatusCommand(pi, "switch-agentStatus");
 
 	pi.on("session_start", (_event, ctx) => {

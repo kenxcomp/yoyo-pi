@@ -36,13 +36,17 @@ Each `plan-agent` run must also rewrite `.plan/todo.jsonl` with one JSON object 
 
 ## Plan review and exit handoff
 
-After a successful `plan-agent` run, the parent `plan-mode` extension displays the markdown plan content before asking whether to exit plan mode. The review choices are:
+While `plan-agent` is running, the parent `plan-mode` extension shows a one-line live activity widget above the input editor. It updates for child tool activity such as reading/searching/listing/writing files, and while the child assistant streams text it shows the latest non-empty streamed line truncated to one terminal row.
+
+After a clean successful `plan-agent` run, the parent `plan-mode` extension displays the markdown plan content before asking whether to exit plan mode. If the child process created both required outputs (`planExists && todoExists`) but also reported a recoverable transport/model warning such as an `errorMessage`, `stopReason`, non-zero `exitCode`, or `stderr`, the run is classified as reviewable `partial_success` instead of being discarded. The preview and decision dialog show a prominent warning block before the user can approve execution. Missing required outputs and actual aborts remain non-reviewable failures.
+
+The review choices are:
 
 - `plan没问题，允许退出plan mode，开始执行` — exit plan mode, open the todo sidebar, and send a kickoff message to execute the approved plan while updating `.plan/todo.jsonl` statuses.
 - `允许退出plan mode，先搁置` — exit plan mode and open the todo sidebar without starting execution.
 - `不允许退出，需要修改：{修改意见}` — stay in plan mode, collect modification feedback, and ask the main agent to rerun `plan_agent` with the same output path.
 
-When plan mode really exits with an approved/shelved plan, future LLM context is pruned to a hidden handoff containing only the user's original planning prompt, the plan path/content, the todo path, and newer messages. The old planning conversation and `plan_agent` tool history remain in the session file but are not sent as active LLM context.
+When plan mode really exits with an approved/shelved plan, future LLM context is pruned to a hidden handoff containing only the user's original planning prompt, the plan path/content, the todo path, any plan-agent partial-success warnings, and newer messages. The old planning conversation and `plan_agent` tool history remain in the session file but are not sent as active LLM context.
 
 ## Todo sidebar
 

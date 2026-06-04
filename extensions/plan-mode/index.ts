@@ -41,6 +41,9 @@ const MAX_PLAN_HANDOFF_CHARS = 120_000;
 const PLAN_PREVIEW_CUSTOM_TYPE = "plan-mode-exit-plan-preview";
 const PLAN_HANDOFF_CUSTOM_TYPE = "plan-mode-exit-handoff";
 const PLAN_CONTEXT_RESET_CUSTOM_TYPE = "plan-mode-context-reset";
+const PLAN_AGENT_ACTIVITY_WIDGET = "plan-agent-activity";
+const PLAN_AGENT_ACTIVITY_THROTTLE_MS = 80;
+const PLAN_AGENT_ACTIVITY_MAX_CHARS = 500;
 const PLAN_EXIT_EXECUTE_OPTION = "plan没问题，允许退出plan mode，开始执行";
 const PLAN_EXIT_SHELVE_OPTION = "允许退出plan mode，先搁置";
 const PLAN_EXIT_REVISE_OPTION = "不允许退出，需要修改：{修改意见}";
@@ -80,6 +83,18 @@ interface PlanAgentRunResult {
 	errorMessage?: string;
 }
 
+type PlanAgentRunStatus = "success" | "partial_success" | "failure";
+
+interface PlanAgentRunClassification {
+	status: PlanAgentRunStatus;
+	reviewable: boolean;
+	processOk: boolean;
+	outputsOk: boolean;
+	actualAbort: boolean;
+	warnings: string[];
+	failureReasons: string[];
+}
+
 type PlanReviewSource = "command" | "tool";
 type PlanExitDecision = "execute" | "shelve" | "explicit";
 
@@ -111,6 +126,8 @@ interface PlanExitHandoff {
 	absoluteTodoPath: string;
 	planContent: string;
 	planContentTruncated: boolean;
+	planAgentStatus?: PlanAgentRunStatus;
+	planAgentWarnings?: string[];
 	createdAt: string;
 }
 
@@ -208,6 +225,58 @@ function truncateTail(text: string, maxChars: number): string {
 	return `[... truncated ${text.length - maxChars} characters ...]\n${text.slice(-maxChars)}`;
 }
 
+function isIssueStopReason(stopReason: string | undefined): boolean {
+	if (!stopReason) return false;
+	const normalized = stopReason.trim().toLowerCase();
+	if (!normalized) return false;
+	return !["end", "stop", "stopped", "complete", "completed", "done"].includes(normalized);
+}
+
+function isActualPlanAgentAbort(result: PlanAgentRunResult): boolean {
+	return result.stopReason === "aborted";
+}
+
+function planAgentWarningLines(result: PlanAgentRunResult): string[] {
+	const warnings: string[] = [];
+	if (result.errorMessage) warnings.push(`errorMessage: ${result.errorMessage}`);
+	if (result.stopReason && isIssueStopReason(result.stopReason)) warnings.push(`stopReason: ${result.stopReason}`);
+	if (result.exitCode !== 0) warnings.push(`exitCode: ${result.exitCode}`);
+	if (result.stderr) warnings.push(`stderr:\n${result.stderr}`);
+	return warnings;
+}
+
+export function classifyPlanAgentRun(result: PlanAgentRunResult): PlanAgentRunClassification {
+	const outputsOk = result.planExists && result.todoExists;
+	const actualAbort = isActualPlanAgentAbort(result);
+	const warnings = planAgentWarningLines(result);
+	const processOk = result.exitCode === 0 && warnings.length === 0;
+	const failureReasons: string[] = [];
+
+	if (!result.planExists) failureReasons.push(`missing plan file: ${result.planPath}`);
+	if (!result.todoExists) failureReasons.push(`missing todo file: ${result.todoPath}`);
+	if (actualAbort) failureReasons.push("plan-agent run was aborted");
+	if (!outputsOk || actualAbort) {
+		if (result.exitCode !== 0) failureReasons.push(`exitCode: ${result.exitCode}`);
+		if (result.errorMessage) failureReasons.push(`errorMessage: ${result.errorMessage}`);
+		if (result.stopReason) failureReasons.push(`stopReason: ${result.stopReason}`);
+		if (result.stderr) failureReasons.push(`stderr:\n${result.stderr}`);
+		return { status: "failure", reviewable: false, processOk, outputsOk, actualAbort, warnings, failureReasons };
+	}
+
+	if (processOk) {
+		return { status: "success", reviewable: true, processOk, outputsOk, actualAbort, warnings: [], failureReasons: [] };
+	}
+
+	return { status: "partial_success", reviewable: true, processOk, outputsOk, actualAbort, warnings, failureReasons: [] };
+}
+
+function formatPlanAgentWarningBlock(result: PlanAgentRunResult): string {
+	const classification = classifyPlanAgentRun(result);
+	if (classification.status !== "partial_success") return "";
+	const lines = classification.warnings.length > 0 ? classification.warnings : ["plan-agent reported a non-clean run even though required outputs exist"];
+	return [`> ⚠️ Plan-agent partial success: required plan/todo outputs exist, but the child run reported warnings. Review carefully before executing.`, ...lines.map((line) => `> ${line.replace(/\n/g, "\n> ")}`)].join("\n");
+}
+
 function loadPlanAgent(): PlanAgentConfig {
 	const filePath = PLAN_AGENT_PATH;
 	if (!fs.existsSync(filePath)) {
@@ -262,6 +331,186 @@ function getFinalOutput(messages: any[]): string {
 		if (text) return text;
 	}
 	return "";
+}
+
+function compactActivityText(value: unknown, maxChars = PLAN_AGENT_ACTIVITY_MAX_CHARS): string {
+	let text: string;
+	if (typeof value === "string") text = value;
+	else if (value === undefined || value === null) text = "";
+	else {
+		try {
+			text = JSON.stringify(value);
+		} catch {
+			text = String(value);
+		}
+	}
+	const cleaned = text.replace(/[\r\n\t]+/g, " ").replace(/\s+/g, " ").trim();
+	if (cleaned.length <= maxChars) return cleaned;
+	return `${cleaned.slice(0, Math.max(0, maxChars - 1))}…`;
+}
+
+function keepActivityTail(text: string, maxChars = 4_000): string {
+	return text.length <= maxChars ? text : text.slice(-maxChars);
+}
+
+function latestNonEmptyLine(text: string): string {
+	const lines = text
+		.replace(/\r/g, "\n")
+		.split("\n")
+		.map((line) => compactActivityText(line))
+		.filter(Boolean);
+	return lines.at(-1) ?? "";
+}
+
+function activityArg(args: unknown, key: string): string | undefined {
+	if (!args || typeof args !== "object") return undefined;
+	const value = (args as Record<string, unknown>)[key];
+	if (typeof value === "string") {
+		const cleaned = stripAtPrefix(value.trim());
+		return cleaned ? compactActivityText(cleaned, 180) : undefined;
+	}
+	if (typeof value === "number" || typeof value === "boolean") return String(value);
+	return undefined;
+}
+
+function summarizeActivityArgs(args: unknown): string {
+	if (!args || typeof args !== "object") return "";
+	const entries = Object.entries(args as Record<string, unknown>)
+		.slice(0, 3)
+		.map(([key, value]) => `${key}=${compactActivityText(value, 80)}`)
+		.filter((entry) => !entry.endsWith("="));
+	return entries.join(" ");
+}
+
+function describePlanAgentToolActivity(
+	toolName: string | undefined,
+	args: unknown,
+	phase: "start" | "end",
+	isError = false,
+): string {
+	const name = toolName || "tool";
+	const pathArg = activityArg(args, "path");
+	const pattern = activityArg(args, "pattern");
+	const command = activityArg(args, "command");
+	const query = activityArg(args, "query");
+	const done = isError ? "failed" : "done";
+
+	if (phase === "end") {
+		const target = pathArg || pattern || query || command;
+		return compactActivityText(`${name} ${done}${target ? `: ${target}` : ""}`);
+	}
+
+	switch (name) {
+		case "read":
+			return compactActivityText(`reading ${pathArg || "file"}`);
+		case "grep":
+			return compactActivityText(`searching${pattern ? ` "${pattern}"` : ""}${pathArg ? ` in ${pathArg}` : ""}`);
+		case "find":
+			return compactActivityText(`finding${pattern ? ` ${pattern}` : " files"}${pathArg ? ` in ${pathArg}` : ""}`);
+		case "ls":
+			return compactActivityText(`listing ${pathArg || "."}`);
+		case "bash":
+			return compactActivityText(`running ${command || "bash command"}`);
+		case "write":
+			return compactActivityText(`writing ${pathArg || "file"}`);
+		case "edit":
+			return compactActivityText(`editing ${pathArg || "file"}`);
+		case "plan_web_search":
+			return compactActivityText(`web searching${query ? ` ${query}` : ""}`);
+		case "plan_delete":
+			return compactActivityText(`deleting ${pathArg || "file under .plan/"}`);
+		default: {
+			const summary = summarizeActivityArgs(args);
+			return compactActivityText(`${name}${summary ? ` ${summary}` : ""}`);
+		}
+	}
+}
+
+function extractAssistantTextDelta(event: unknown): string {
+	if (!event || typeof event !== "object") return "";
+	const data = event as { type?: string; delta?: unknown; content?: unknown };
+	if (data.type === "text_delta" && typeof data.delta === "string") return data.delta;
+	if (data.type === "text_end" && typeof data.content === "string") return data.content;
+	return "";
+}
+
+function setPlanAgentActivityWidget(ctx: ExtensionContext, status: string): void {
+	if (!ctx.hasUI) return;
+	const text = compactActivityText(status.replace(/^plan-agent\s*:?\s*/i, ""));
+	if (!text) return;
+	ctx.ui.setWidget(PLAN_AGENT_ACTIVITY_WIDGET, (_tui: TUI, theme: Theme): Component => {
+		return {
+			render(width: number): string[] {
+				const prefix = `${theme.fg("accent", "▸ plan-agent")} ${theme.fg("dim", "·")} `;
+				return [truncateToWidth(`${prefix}${theme.fg("text", text)}`, Math.max(1, width), "…", true)];
+			},
+			invalidate(): void {},
+		};
+	});
+}
+
+function clearPlanAgentActivityWidget(ctx: ExtensionContext): void {
+	if (ctx.hasUI) ctx.ui.setWidget(PLAN_AGENT_ACTIVITY_WIDGET, undefined);
+}
+
+function createPlanAgentActivityReporter(
+	ctx: ExtensionContext,
+	onFlush?: (status: string) => void,
+): { update: (status: string, immediate?: boolean) => void; clear: () => void } {
+	let pending: string | undefined;
+	let lastFlushAt = 0;
+	let flushTimer: ReturnType<typeof setTimeout> | undefined;
+	let closed = false;
+
+	const flush = () => {
+		if (closed || !pending) return;
+		const status = pending;
+		pending = undefined;
+		lastFlushAt = Date.now();
+		onFlush?.(status);
+		setPlanAgentActivityWidget(ctx, status);
+	};
+
+	const schedule = (immediate: boolean) => {
+		if (immediate) {
+			if (flushTimer) clearTimeout(flushTimer);
+			flushTimer = undefined;
+			flush();
+			return;
+		}
+
+		const elapsed = Date.now() - lastFlushAt;
+		if (elapsed >= PLAN_AGENT_ACTIVITY_THROTTLE_MS) {
+			if (flushTimer) clearTimeout(flushTimer);
+			flushTimer = undefined;
+			flush();
+			return;
+		}
+
+		if (!flushTimer) {
+			flushTimer = setTimeout(() => {
+				flushTimer = undefined;
+				flush();
+			}, Math.max(0, PLAN_AGENT_ACTIVITY_THROTTLE_MS - elapsed));
+		}
+	};
+
+	return {
+		update(status: string, immediate = false): void {
+			if (closed) return;
+			const cleaned = compactActivityText(status);
+			if (!cleaned) return;
+			pending = cleaned;
+			schedule(immediate);
+		},
+		clear(): void {
+			closed = true;
+			if (flushTimer) clearTimeout(flushTimer);
+			flushTimer = undefined;
+			pending = undefined;
+			clearPlanAgentActivityWidget(ctx);
+		},
+	};
 }
 
 function buildTaskPrompt(
@@ -371,6 +620,7 @@ async function runPlanAgent(ctx: ExtensionContext, options: PlanAgentRunOptions)
 		const invocation = getPiInvocation(args);
 
 		let stdoutBuffer = "";
+		let assistantDraft = "";
 		let wasAborted = false;
 		const exitCode = await new Promise<number>((resolve) => {
 			const proc = spawn(invocation.command, invocation.args, {
@@ -389,12 +639,35 @@ async function runPlanAgent(ctx: ExtensionContext, options: PlanAgentRunOptions)
 					return;
 				}
 
+				if (event.type === "message_start" && event.message?.role === "assistant") {
+					assistantDraft = "";
+				}
+
+				if (event.type === "message_update" && event.message?.role === "assistant") {
+					const streamEvent = event.assistantMessageEvent as { type?: string } | undefined;
+					const delta = extractAssistantTextDelta(streamEvent);
+					if (delta) {
+						assistantDraft = keepActivityTail(streamEvent?.type === "text_end" ? delta : assistantDraft + delta);
+						const line = latestNonEmptyLine(assistantDraft);
+						if (line) options.onStatus?.(`replying: ${line}`);
+					} else {
+						const text = assistantText(event.message);
+						if (text) {
+							assistantDraft = keepActivityTail(text);
+							const line = latestNonEmptyLine(assistantDraft);
+							if (line) options.onStatus?.(`replying: ${line}`);
+						}
+					}
+				}
+
 				if (event.type === "message_end" && event.message) {
 					messages.push(event.message);
 					if (event.message.role === "assistant") {
 						model = event.message.model || model;
 						stopReason = event.message.stopReason || stopReason;
 						errorMessage = event.message.errorMessage || errorMessage;
+						const line = latestNonEmptyLine(assistantText(event.message));
+						if (line) options.onStatus?.(`replying: ${line}`);
 					}
 				}
 
@@ -407,10 +680,10 @@ async function runPlanAgent(ctx: ExtensionContext, options: PlanAgentRunOptions)
 				}
 
 				if (event.type === "tool_execution_start") {
-					options.onStatus?.(`${PLAN_AGENT_NAME}: ${event.toolName || "tool"}...`);
+					options.onStatus?.(describePlanAgentToolActivity(event.toolName, event.args, "start"));
 				}
 				if (event.type === "tool_execution_end") {
-					options.onStatus?.(`${PLAN_AGENT_NAME}: ${event.toolName || "tool"} done`);
+					options.onStatus?.(describePlanAgentToolActivity(event.toolName, event.args, "end", Boolean(event.isError)));
 				}
 			};
 
@@ -452,7 +725,7 @@ async function runPlanAgent(ctx: ExtensionContext, options: PlanAgentRunOptions)
 
 		const planExists = fs.existsSync(absolutePlanPath);
 		const todoExists = fs.existsSync(absoluteTodoPath);
-		return {
+		const runResult: PlanAgentRunResult = {
 			planPath,
 			absolutePlanPath,
 			planExists,
@@ -466,34 +739,39 @@ async function runPlanAgent(ctx: ExtensionContext, options: PlanAgentRunOptions)
 			stopReason,
 			errorMessage,
 		};
+		const classification = classifyPlanAgentRun(runResult);
+		options.onStatus?.(
+			classification.reviewable
+				? classification.status === "partial_success"
+					? `finished with warning(s): ${runResult.planPath}`
+					: `finished: ${runResult.planPath}`
+				: `finished with issue(s): ${runResult.planPath}`,
+		);
+		return runResult;
 	} finally {
 		if (tmpDir) await fsp.rm(tmpDir, { recursive: true, force: true });
 	}
 }
 
-function isPlanAgentProcessOk(result: PlanAgentRunResult): boolean {
-	return result.exitCode === 0 && !result.errorMessage && result.stopReason !== "error" && result.stopReason !== "aborted";
-}
-
-function isPlanAgentRunOk(result: PlanAgentRunResult): boolean {
-	return isPlanAgentProcessOk(result) && result.planExists && result.todoExists;
-}
-
 function formatPlanAgentResult(result: PlanAgentRunResult): string {
-	const processOk = isPlanAgentProcessOk(result);
-	const outputsOk = result.planExists && result.todoExists;
-	const ok = processOk && outputsOk;
-	const status = processOk
-		? outputsOk
+	const classification = classifyPlanAgentRun(result);
+	const status =
+		classification.status === "success"
 			? "Plan agent finished."
-			: "Plan agent finished with missing required outputs."
-		: `Plan agent failed (exit ${result.exitCode}).`;
+			: classification.status === "partial_success"
+				? "Plan agent produced required outputs with warnings; review is available."
+				: classification.outputsOk
+					? `Plan agent failed despite creating required outputs (exit ${result.exitCode}).`
+					: `Plan agent failed or missed required outputs (exit ${result.exitCode}).`;
 	const fileStatus = result.planExists ? `Plan file: ${result.planPath}` : `Plan file was not created: ${result.planPath}`;
 	const todoStatus = result.todoExists ? `Todo file: ${result.todoPath}` : `Todo file was not created: ${result.todoPath}`;
 	const parts = [status, fileStatus, todoStatus];
+	const warningBlock = formatPlanAgentWarningBlock(result);
+	if (warningBlock) parts.push(warningBlock);
+	if (classification.status === "failure" && classification.failureReasons.length > 0) {
+		parts.push(`Failure details:\n${classification.failureReasons.map((line) => `- ${line.replace(/\n/g, "\n  ")}`).join("\n")}`);
+	}
 	if (result.finalOutput) parts.push(result.finalOutput);
-	if (!ok && result.errorMessage) parts.push(`Error: ${result.errorMessage}`);
-	if (!ok && result.stderr) parts.push(`stderr:\n${result.stderr}`);
 	return parts.join("\n\n");
 }
 
@@ -552,24 +830,32 @@ async function readPlanContent(filePath: string, maxChars: number): Promise<Plan
 
 function buildPlanPreviewContent(review: PlanReviewRequest, plan: PlanContentRead): string {
 	const header = `# Plan preview before exiting plan mode\n\nPlan file: \`${review.planPath}\`\nTodo file: \`${review.todoPath}\``;
+	const warningBlock = formatPlanAgentWarningBlock(review.result);
+	const warning = warningBlock ? `\n\n${warningBlock}` : "";
 	if (plan.error) {
-		return `${header}\n\nCould not read the plan file before exit: ${plan.error}`;
+		return `${header}${warning}\n\nCould not read the plan file before exit: ${plan.error}`;
 	}
 	const truncation = plan.truncated
 		? `\n\n> Preview truncated. Open \`${review.planPath}\` for the full plan.`
 		: "";
-	return `${header}${truncation}\n\n---\n\n${plan.content || "(plan file is empty)"}`;
+	return `${header}${warning}${truncation}\n\n---\n\n${plan.content || "(plan file is empty)"}`;
 }
 
 function buildPlanHandoffContent(handoff: PlanExitHandoff): string {
 	const truncation = handoff.planContentTruncated
 		? "\n\nNote: The plan content below is truncated; use the plan file for the complete version."
 		: "";
-	return `[PLAN MODE EXIT HANDOFF]\nThe planning conversation before this handoff was intentionally removed from future LLM context. Use only this original prompt, plan, todo path, and newer messages.\n\n## Original user prompt\n${handoff.originalPrompt}\n\n## Plan file\n${handoff.planPath}\n\n## Todo file\n${handoff.todoPath}${truncation}\n\n## Plan content\n${handoff.planContent || "(plan file is empty or unavailable)"}`;
+	const warning = handoff.planAgentStatus === "partial_success" && handoff.planAgentWarnings?.length
+		? `\n\n## Plan-agent warnings\n${handoff.planAgentWarnings.map((line) => `- ${line.replace(/\n/g, "\n  ")}`).join("\n")}`
+		: "";
+	return `[PLAN MODE EXIT HANDOFF]\nThe planning conversation before this handoff was intentionally removed from future LLM context. Use only this original prompt, plan, todo path, and newer messages.\n\n## Original user prompt\n${handoff.originalPrompt}\n\n## Plan file\n${handoff.planPath}\n\n## Todo file\n${handoff.todoPath}${warning}${truncation}\n\n## Plan content\n${handoff.planContent || "(plan file is empty or unavailable)"}`;
 }
 
 function buildPlanExecuteKickoffPrompt(handoff: PlanExitHandoff): string {
-	return `Execute the approved plan now.\n\nOriginal user prompt:\n${handoff.originalPrompt}\n\nPlan file: ${handoff.planPath}\nTodo JSONL: ${handoff.todoPath}\n\nUse the plan-mode exit handoff context as the source of truth. Keep ${handoff.todoPath} updated as you work: set each todo to in_progress before starting it, done with completedAt after finishing it, and blocked with an explanation if you cannot proceed.`;
+	const warning = handoff.planAgentStatus === "partial_success" && handoff.planAgentWarnings?.length
+		? `\n\nPlan-agent warnings to keep in mind before executing:\n${handoff.planAgentWarnings.map((line) => `- ${line.replace(/\n/g, "\n  ")}`).join("\n")}`
+		: "";
+	return `Execute the approved plan now.\n\nOriginal user prompt:\n${handoff.originalPrompt}\n\nPlan file: ${handoff.planPath}\nTodo JSONL: ${handoff.todoPath}${warning}\n\nUse the plan-mode exit handoff context as the source of truth. Keep ${handoff.todoPath} updated as you work: set each todo to in_progress before starting it, done with completedAt after finishing it, and blocked with an explanation if you cannot proceed.`;
 }
 
 function buildPlanRevisePrompt(review: PlanReviewRequest, feedback: string): string {
@@ -1449,7 +1735,7 @@ export default function planModeExtension(pi: ExtensionAPI): void {
 
 	function updateStatus(ctx: ExtensionContext): void {
 		if (!ctx.hasUI) return;
-		if (planModeEnabled) ctx.ui.setStatus("plan-mode", ctx.ui.theme.fg("warning", "⏸ plan"));
+		if (planModeEnabled) ctx.ui.setStatus("plan-mode", ctx.ui.theme.fg("warning", "|| plan"));
 		else ctx.ui.setStatus("plan-mode", undefined);
 	}
 
@@ -1469,7 +1755,8 @@ export default function planModeExtension(pi: ExtensionAPI): void {
 	}
 
 	function rememberPlanReview(prompt: string, result: PlanAgentRunResult, source: PlanReviewSource): PlanReviewRequest | undefined {
-		if (!isPlanAgentRunOk(result)) {
+		const classification = classifyPlanAgentRun(result);
+		if (!classification.reviewable) {
 			clearPlanReviewState();
 			return undefined;
 		}
@@ -1491,6 +1778,7 @@ export default function planModeExtension(pi: ExtensionAPI): void {
 		decision: PlanExitDecision,
 	): Promise<PlanExitHandoff> {
 		const plan = await readPlanContent(review.absolutePlanPath, MAX_PLAN_HANDOFF_CHARS);
+		const classification = classifyPlanAgentRun(review.result);
 		return {
 			id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
 			decision,
@@ -1501,6 +1789,8 @@ export default function planModeExtension(pi: ExtensionAPI): void {
 			absoluteTodoPath: review.absoluteTodoPath,
 			planContent: plan.error ? `(Could not read plan file: ${plan.error})` : plan.content,
 			planContentTruncated: plan.truncated,
+			planAgentStatus: classification.status,
+			planAgentWarnings: classification.warnings,
 			createdAt: new Date().toISOString(),
 		};
 	}
@@ -1523,6 +1813,8 @@ export default function planModeExtension(pi: ExtensionAPI): void {
 					originalPrompt: options.handoff.originalPrompt,
 					planPath: options.handoff.planPath,
 					todoPath: options.handoff.todoPath,
+					planAgentStatus: options.handoff.planAgentStatus,
+					planAgentWarnings: options.handoff.planAgentWarnings,
 					createdAt: options.handoff.createdAt,
 				},
 			});
@@ -1534,6 +1826,7 @@ export default function planModeExtension(pi: ExtensionAPI): void {
 
 	async function displayPlanForExitRequest(ctx: ExtensionContext, review: PlanReviewRequest): Promise<PlanContentRead> {
 		const plan = await readPlanContent(review.absolutePlanPath, MAX_PLAN_PREVIEW_CHARS);
+		const classification = classifyPlanAgentRun(review.result);
 		sendPlanCustomMessage(pi, ctx, {
 			customType: PLAN_PREVIEW_CUSTOM_TYPE,
 			content: buildPlanPreviewContent(review, plan),
@@ -1544,8 +1837,13 @@ export default function planModeExtension(pi: ExtensionAPI): void {
 				todoPath: review.todoPath,
 				truncated: plan.truncated,
 				error: plan.error,
+				planAgentStatus: classification.status,
+				planAgentWarnings: classification.warnings,
 			},
 		});
+		if (classification.status === "partial_success" && ctx.hasUI) {
+			ctx.ui.notify("Plan agent produced required outputs with warnings; review the warning block before approving.", "warning");
+		}
 		if (plan.error && ctx.hasUI) ctx.ui.notify(`Could not read plan before exit: ${plan.error}`, "warning");
 		return plan;
 	}
@@ -1569,17 +1867,26 @@ export default function planModeExtension(pi: ExtensionAPI): void {
 		planReviewInProgress = true;
 		try {
 			await displayPlanForExitRequest(ctx, review);
+			const classification = classifyPlanAgentRun(review.result);
 			if (!ctx.hasUI) {
 				sendPlanCustomMessage(pi, ctx, {
 					customType: "plan-mode-exit-decision-skipped",
 					content: "Plan mode exit decision skipped because no interactive UI is available. Plan mode remains enabled.",
 					display: true,
-					details: { planPath: review.planPath, todoPath: review.todoPath },
+					details: {
+						planPath: review.planPath,
+						todoPath: review.todoPath,
+						planAgentStatus: classification.status,
+						planAgentWarnings: classification.warnings,
+					},
 				});
 				return;
 			}
 
-			const choice = await ctx.ui.select("Plan 已生成，是否退出 plan mode？", [
+			const promptTitle = classification.status === "partial_success"
+				? "Plan 已生成，但 plan-agent 有警告。确认看过警告后是否退出 plan mode？"
+				: "Plan 已生成，是否退出 plan mode？";
+			const choice = await ctx.ui.select(promptTitle, [
 				PLAN_EXIT_EXECUTE_OPTION,
 				PLAN_EXIT_SHELVE_OPTION,
 				PLAN_EXIT_REVISE_OPTION,
@@ -1620,16 +1927,19 @@ export default function planModeExtension(pi: ExtensionAPI): void {
 
 	async function spawnFromCommand(prompt: string, ctx: ExtensionContext, outputPath?: string): Promise<void> {
 		clearPlanReviewState();
+		const activity = createPlanAgentActivityReporter(ctx, (status) => {
+			if (ctx.hasUI) ctx.ui.setStatus("plan-agent", ctx.ui.theme.fg("accent", `plan-agent: ${status}`));
+		});
 		try {
-			if (ctx.hasUI) ctx.ui.setStatus("plan-agent", ctx.ui.theme.fg("accent", "plan-agent…"));
 			const result = await runPlanAgent(ctx, {
 				prompt,
 				outputPath,
 				signal: ctx.signal,
-				onStatus: (status) => {
-					if (ctx.hasUI) ctx.ui.setStatus("plan-agent", ctx.ui.theme.fg("accent", status));
-				},
+				onStatus: (status) => activity.update(status),
 			});
+			activity.clear();
+			if (ctx.hasUI) ctx.ui.setStatus("plan-agent", undefined);
+			const classification = classifyPlanAgentRun(result);
 			pi.sendMessage(
 				{
 					customType: "plan-agent-result",
@@ -1643,17 +1953,22 @@ export default function planModeExtension(pi: ExtensionAPI): void {
 						exitCode: result.exitCode,
 						model: result.model,
 						stopReason: result.stopReason,
+						errorMessage: result.errorMessage,
+						planAgentStatus: classification.status,
+						planAgentWarnings: classification.warnings,
+						exitReviewPending: classification.reviewable,
 					},
 				},
 				{ triggerTurn: false },
 			);
 			if (ctx.hasUI) {
-				const outputsOk = result.planExists && result.todoExists;
 				ctx.ui.notify(
-					outputsOk
+					classification.status === "success"
 						? `Plan written: ${result.planPath}; todos: ${result.todoPath}`
-						: `Plan agent finished but missed required output(s): ${result.planPath}, ${result.todoPath}`,
-					outputsOk ? "info" : "warning",
+						: classification.status === "partial_success"
+							? `Plan written with warnings: ${result.planPath}; todos: ${result.todoPath}`
+							: `Plan agent finished but missed required output(s): ${result.planPath}, ${result.todoPath}`,
+					classification.status === "success" ? "info" : "warning",
 				);
 			}
 			const review = rememberPlanReview(prompt, result, "command");
@@ -1668,6 +1983,7 @@ export default function planModeExtension(pi: ExtensionAPI): void {
 			);
 			if (ctx.hasUI) ctx.ui.notify(`Plan agent failed: ${message}`, "error");
 		} finally {
+			activity.clear();
 			if (ctx.hasUI) ctx.ui.setStatus("plan-agent", undefined);
 			updateStatus(ctx);
 		}
@@ -1796,34 +2112,47 @@ export default function planModeExtension(pi: ExtensionAPI): void {
 			}
 
 			clearPlanReviewState();
-			const result = await runPlanAgent(ctx, {
-				prompt: params.prompt,
-				outputPath: params.outputPath,
-				signal,
-				onStatus: (status) =>
-					onUpdate?.({
-						content: [{ type: "text", text: status }],
-						details: { status },
-					}),
+			const activity = createPlanAgentActivityReporter(ctx, (status) => {
+				if (ctx.hasUI) ctx.ui.setStatus("plan-agent", ctx.ui.theme.fg("accent", `plan-agent: ${status}`));
+				onUpdate?.({
+					content: [{ type: "text", text: status }],
+					details: { status },
+				});
 			});
 
-			const review = rememberPlanReview(params.prompt, result, "tool");
-			pendingPlanReview = review;
-			if (result.todoExists) await openTodoSidebar(ctx, { initialPath: result.absoluteTodoPath });
+			try {
+				const result = await runPlanAgent(ctx, {
+					prompt: params.prompt,
+					outputPath: params.outputPath,
+					signal,
+					onStatus: (status) => activity.update(status),
+				});
 
-			return {
-				content: [{ type: "text", text: formatPlanAgentResult(result) }],
-				details: {
-					planPath: result.planPath,
-					planExists: result.planExists,
-					todoPath: result.todoPath,
-					todoExists: result.todoExists,
-					exitCode: result.exitCode,
-					model: result.model,
-					stopReason: result.stopReason,
-					exitReviewPending: Boolean(review),
-				},
-			};
+				const classification = classifyPlanAgentRun(result);
+				const review = rememberPlanReview(params.prompt, result, "tool");
+				pendingPlanReview = review;
+				if (result.todoExists) await openTodoSidebar(ctx, { initialPath: result.absoluteTodoPath });
+
+				return {
+					content: [{ type: "text", text: formatPlanAgentResult(result) }],
+					details: {
+						planPath: result.planPath,
+						planExists: result.planExists,
+						todoPath: result.todoPath,
+						todoExists: result.todoExists,
+						exitCode: result.exitCode,
+						model: result.model,
+						stopReason: result.stopReason,
+						errorMessage: result.errorMessage,
+						planAgentStatus: classification.status,
+						planAgentWarnings: classification.warnings,
+						exitReviewPending: Boolean(review),
+					},
+				};
+			} finally {
+				activity.clear();
+				if (ctx.hasUI) ctx.ui.setStatus("plan-agent", undefined);
+			}
 		},
 	});
 
